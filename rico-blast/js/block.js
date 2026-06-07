@@ -119,10 +119,11 @@ class Block {
     roundedRect(ctx, x, y, w, h, r);
     ctx.clip();
     ctx.fillStyle = colors.body;
-    ctx.fillRect(x, y, Math.max(1, w * ratio), h);
+    const fillHeight = h * ratio;
+    ctx.fillRect(x, y + h - fillHeight, w, Math.max(1, fillHeight));
     if (ratio < 0.995) {
       ctx.fillStyle = "rgba(4,6,16,0.22)";
-      ctx.fillRect(x + w * ratio, y, w * (1 - ratio), h);
+      ctx.fillRect(x, y, w, h - fillHeight);
     }
     ctx.restore();
 

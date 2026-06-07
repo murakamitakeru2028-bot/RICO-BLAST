@@ -3364,3 +3364,345 @@ button {
 .confirm-actions button {
   font-size: 13px;
 }
+
+/* Modern gameplay HUD pass */
+#screen-game.active {
+  grid-template-rows: 8.5% 51.5% 7% 20% 13%;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0) 18%),
+    linear-gradient(160deg, rgba(74,158,255,0.08), transparent 36%),
+    linear-gradient(20deg, rgba(124,245,178,0.06), transparent 40%),
+    #080a12;
+  border-color: rgba(246,251,255,0.13);
+  box-shadow:
+    0 22px 64px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(103,216,255,0.07) inset;
+}
+
+#hud-bar,
+#paddle-hp,
+#slot-bar,
+#paddle-status {
+  background:
+    linear-gradient(180deg, rgba(246,251,255,0.055), rgba(246,251,255,0.015)),
+    rgba(9,11,20,0.96);
+}
+
+#hud-bar {
+  grid-template-columns: minmax(0, 1fr) 52px;
+  grid-template-rows: minmax(34px, 1fr) 17px;
+  gap: 5px 8px;
+  padding: 6px 9px 7px;
+  border-bottom: 1px solid rgba(103,216,255,0.18);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.075) inset,
+    0 10px 22px rgba(0,0,0,0.22);
+}
+
+.score-stat {
+  padding: 4px 9px;
+  border: 1px solid rgba(255,230,107,0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255,230,107,0.12), rgba(103,216,255,0.055)),
+    rgba(20,23,38,0.92);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 0 20px rgba(255,230,107,0.08);
+}
+
+.score-stat .hud-label,
+.hud-progress-row,
+.hp-label,
+#hp-token-display span,
+.slot-tag,
+.slot-detail {
+  color: rgba(246,251,255,0.62);
+}
+
+.score-stat b {
+  color: #fff2a8;
+  font-size: 27px;
+  line-height: 0.9;
+  text-shadow:
+    0 0 14px rgba(255,230,107,0.26),
+    0 1px 0 rgba(0,0,0,0.58);
+}
+
+.hud-button {
+  border: 1px solid rgba(103,216,255,0.24);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(103,216,255,0.13), rgba(103,216,255,0.035)),
+    #141829;
+  color: rgba(246,251,255,0.78);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.1) inset,
+    0 0 14px rgba(103,216,255,0.08);
+}
+
+.hud-button.active {
+  border-color: rgba(124,245,178,0.38);
+  background:
+    linear-gradient(180deg, rgba(124,245,178,0.18), rgba(124,245,178,0.045)),
+    #111b1d;
+  color: #d9fff0;
+}
+
+#hud-progress {
+  height: 17px;
+}
+
+.hud-progress-track {
+  border-color: rgba(246,251,255,0.16);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.12)),
+    rgba(255,255,255,0.055);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 0 14px rgba(74,158,255,0.07);
+}
+
+#hud-progress-fill {
+  background: linear-gradient(90deg, #67d8ff, #7cf5b2, #ffe66b);
+  box-shadow:
+    0 0 12px rgba(103,216,255,0.24),
+    0 0 18px rgba(124,245,178,0.12);
+}
+
+#game-stage {
+  border-top: 1px solid rgba(255,255,255,0.045);
+  border-bottom: 1px solid rgba(103,216,255,0.13);
+  background:
+    linear-gradient(180deg, rgba(103,216,255,0.035), transparent 20%),
+    #080a12;
+  box-shadow:
+    0 0 0 1px rgba(103,216,255,0.08) inset,
+    0 14px 30px rgba(0,0,0,0.26) inset;
+}
+
+#paddle-hp {
+  grid-template-columns: minmax(108px, 0.72fr) minmax(0, 1.28fr);
+  gap: 9px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.055);
+}
+
+#hp-token-display,
+#paddle-hp-meter {
+  min-height: 38px;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.018)),
+    #121625;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 10px 20px rgba(0,0,0,0.16);
+}
+
+#hp-token-display {
+  border-color: rgba(255,230,107,0.38);
+  padding-left: 33px;
+}
+
+#hp-token-display::before {
+  left: 11px;
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(135deg, #fff7b0, #ffe66b 54%, #d0a93e);
+  box-shadow:
+    0 0 0 1px rgba(75,52,0,0.32) inset,
+    0 0 14px rgba(255,230,107,0.46);
+}
+
+#hp-token-display b {
+  color: #ffe66b;
+  font-size: 21px;
+  text-shadow: 0 0 12px rgba(255,230,107,0.28);
+}
+
+#paddle-hp-meter {
+  border-color: rgba(124,245,178,0.18);
+  padding: 6px 8px;
+}
+
+#paddle-hp-track {
+  height: 10px;
+  border-color: rgba(255,255,255,0.14);
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.1), rgba(255,255,255,0.04)),
+    rgba(255,255,255,0.06);
+}
+
+#paddle-hp-fill {
+  background: linear-gradient(90deg, #7cf5b2, #4aff88);
+  box-shadow:
+    0 0 14px rgba(74,255,136,0.34),
+    0 0 22px rgba(124,245,178,0.12);
+}
+
+#paddle-hp.low #paddle-hp-fill {
+  background: linear-gradient(90deg, #ffe66b, #ffcc4a);
+}
+
+#paddle-hp.danger #paddle-hp-fill,
+#paddle-hp.hit #paddle-hp-fill {
+  background: linear-gradient(90deg, #ff5f88, #ff4a4a);
+}
+
+#slot-bar,
+#paddle-status {
+  gap: 8px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.slot {
+  border: 1px solid rgba(246,251,255,0.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-skill-color, #67d8ff) 10%, transparent), transparent 48%),
+    #111524;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.07) inset,
+    0 10px 20px rgba(0,0,0,0.13);
+}
+
+.slot.has-skills {
+  border-color: color-mix(in srgb, var(--primary-skill-color, #67d8ff) 62%, rgba(255,255,255,0.1));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.018)),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-skill-color, #67d8ff) 20%, transparent), transparent 55%),
+    #111524;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 0 18px color-mix(in srgb, var(--primary-skill-color, #67d8ff) 18%, transparent);
+}
+
+.slot.empty {
+  opacity: 0.76;
+  border-color: rgba(246,251,255,0.1);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)),
+    #0f1320;
+}
+
+.slot.buyable {
+  border-color: rgba(255,230,107,0.5);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 0 18px rgba(255,230,107,0.12);
+}
+
+.slot.fallen {
+  border-color: rgba(255,95,136,0.62);
+  background:
+    linear-gradient(180deg, rgba(255,95,136,0.12), rgba(255,95,136,0.025)),
+    #16111b;
+}
+
+.slot.selected-upgrade,
+.slot.selected-skill,
+.slot.targetable,
+.slot.launch-ready {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.1) inset,
+    0 0 0 1px color-mix(in srgb, var(--selected-color, var(--target-color, #7cf5b2)) 32%, transparent) inset,
+    0 0 22px color-mix(in srgb, var(--selected-color, var(--target-color, #7cf5b2)) 22%, transparent);
+}
+
+.slot-icon {
+  border: 1px solid rgba(246,251,255,0.28);
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--primary-skill-color, #67d8ff) 32%, transparent),
+    0 1px 0 rgba(255,255,255,0.22) inset;
+}
+
+.slot-paddle-icon,
+.slot-bumper-icon {
+  border-color: rgba(246,251,255,0.26);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.9), rgba(183,218,235,0.72) 52%, rgba(103,216,255,0.32)),
+    #172033;
+  box-shadow:
+    0 0 14px rgba(103,216,255,0.22),
+    0 1px 0 rgba(255,255,255,0.32) inset;
+}
+
+.slot-bumper-icon {
+  height: 11px;
+}
+
+.slot-bumper-icon::before {
+  height: 3px;
+  background: linear-gradient(90deg, rgba(103,216,255,0), #67d8ff, #f6fbff, #7cf5b2, rgba(124,245,178,0));
+}
+
+.slot-name,
+#paddle-status .slot-name {
+  color: #f6fbff;
+  font-weight: 800;
+}
+
+.slot.has-skills .slot-name {
+  color: color-mix(in srgb, var(--primary-skill-color, #67d8ff) 46%, #ffffff);
+}
+
+.slot-skill-chip {
+  height: 20px;
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--skill-color) 22%, transparent), rgba(255,255,255,0.04)),
+    rgba(255,255,255,0.045);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--skill-color) 10%, transparent);
+}
+
+.slot-skill-dot {
+  box-shadow: 0 0 8px var(--skill-color);
+}
+
+.level-badge,
+.slot-revive {
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.018)),
+    rgba(255,255,255,0.035);
+}
+
+#paddle-status .slot {
+  padding: 8px 9px;
+}
+
+.bumper-dots span {
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.07);
+}
+
+.bumper-dots span.on {
+  background: linear-gradient(180deg, #9effd0, #4aff88);
+  box-shadow: 0 0 9px rgba(74,255,136,0.34);
+}
+
+@media (max-width: 360px) {
+  #screen-game.active {
+    grid-template-rows: 8.5% 51.5% 7% 20% 13%;
+  }
+
+  #hud-bar {
+    grid-template-columns: minmax(0, 1fr) 46px;
+    padding: 5px 7px 6px;
+  }
+
+  .score-stat b {
+    font-size: 24px;
+  }
+
+  #hp-token-display b {
+    font-size: 18px;
+  }
+
+  .slot {
+    padding: 7px 6px;
+  }
+}

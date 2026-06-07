@@ -91,14 +91,19 @@ const Game = {
 
   setupCanvas() {
     if (!this.canvas) return;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.dpr = Math.min(window.devicePixelRatio || 1, 3);
     this.width = this.baseWidth;
-    this.height = this.baseHeight;
     this.canvas.style.width = "100%";
     this.canvas.style.height = "100%";
-    this.canvas.width = Math.floor(this.width * this.dpr);
-    this.canvas.height = Math.floor(this.height * this.dpr);
-    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    const rect = this.canvas.getBoundingClientRect();
+    this.height = rect.width > 0 && rect.height > 0
+      ? Math.round(this.width * (rect.height / rect.width))
+      : this.baseHeight;
+    const bitmapWidth = Math.max(1, Math.round((rect.width || this.width) * this.dpr));
+    const bitmapHeight = Math.max(1, Math.round((rect.height || this.height) * this.dpr));
+    this.canvas.width = bitmapWidth;
+    this.canvas.height = bitmapHeight;
+    this.ctx.setTransform(bitmapWidth / this.width, 0, 0, bitmapHeight / this.height, 0, 0);
     if (this.paddle) {
       this.paddle.y = this.height - 28;
       this.paddle.targetX = clamp(this.paddle.targetX || this.width / 2, 0, this.width);
@@ -109,9 +114,8 @@ const Game = {
 
   setupInput() {
     if (this.inputReady || !this.canvas) return;
-    const gameScreen = document.getElementById("screen-game");
     const toGameX = (clientX) => {
-      const rect = (gameScreen || this.canvas).getBoundingClientRect();
+      const rect = this.canvas.getBoundingClientRect();
       return ((clientX - rect.left) / Math.max(1, rect.width)) * this.width;
     };
     const update = (clientX) => {
@@ -312,7 +316,7 @@ const Game = {
       gap,
       rowGap: 7,
       blockWidth,
-      blockHeight: 22
+      blockHeight: 28
     };
   },
 
@@ -672,12 +676,12 @@ const Game = {
 
   damageBlock(block, amount, sourceBall, source = "hit", depth = 0) {
     if (!this.blocks.includes(block) || block.hp <= 0) return false;
-    const appliedDamage = Math.min(block.hp, Math.max(0, amount));
-    if (appliedDamage > 0) {
+    const displayedDamage = Math.max(0, amount);
+    if (displayedDamage > 0) {
       Effects.showDamageNumber(
         block.cx,
         Math.max(14, block.y + block.height * 0.18),
-        appliedDamage,
+        displayedDamage,
         this.getDamageNumberColor(sourceBall, source),
         source
       );

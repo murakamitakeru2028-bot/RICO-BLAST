@@ -146,91 +146,112 @@ class Bumper {
     const hit = clamp(this.hitFlashTimer / 0.18, 0, 1);
     const revive = clamp(this.flashTimer / 0.3, 0, 1);
     const now = performance.now();
-    const brokenPulse = this.broken ? 0.42 + Math.sin(now / 95) * 0.16 : 0;
-    const railX = 8;
-    const railW = Math.max(0, this.width - railX * 2);
-    const railH = 7;
-    const railY = -2;
-    const coreY = railY + 2.5;
-    const segment = 26;
-    const gap = 5;
+    const pulse = this.broken ? 0.5 + Math.sin(now / 120) * 0.5 : 0;
+    const margin = 12;
+    const railW = Math.max(0, this.width - margin * 2);
+    const railH = 12;
+    const railY = -7;
+    const hpRatio = this.maxHp > 0 ? clamp(this.hp / this.maxHp, 0, 1) : 0;
+    const liveColor = "#67d8ff";
+    const accentColor = "#7cf5b2";
+    const dangerColor = "#ff5f88";
 
     ctx.save();
     ctx.translate(this.x, this.y);
 
-    if (hit > 0 || revive > 0) {
-      ctx.globalAlpha = Math.max(hit, revive) * 0.2;
-      ctx.fillStyle = this.broken ? "rgba(255,74,74,0.52)" : "rgba(246,251,255,0.62)";
-      roundedRect(ctx, 0, railY - 5, this.width, railH + 10, 7);
-      ctx.fill();
-    }
+    ctx.globalAlpha = this.broken ? 0.22 + pulse * 0.08 : 0.2 + hit * 0.18 + revive * 0.18;
+    ctx.fillStyle = this.broken ? "rgba(255,95,136,0.42)" : "rgba(103,216,255,0.32)";
+    roundedRect(ctx, margin - 6, railY - 7, railW + 12, railH + 14, 11);
+    ctx.fill();
 
-    ctx.globalAlpha = this.broken ? 0.62 + brokenPulse * 0.18 : 0.96;
-    ctx.shadowBlur = this.broken ? 3 : 6 + hit * 5 + revive * 7;
-    ctx.shadowColor = this.broken ? "rgba(255,74,74,0.34)" : "rgba(74,158,255,0.24)";
+    ctx.globalAlpha = this.broken ? 0.58 : 0.95;
+    ctx.shadowBlur = this.broken ? 10 + pulse * 8 : 12 + hit * 8 + revive * 10;
+    ctx.shadowColor = this.broken ? "rgba(255,95,136,0.42)" : "rgba(103,216,255,0.34)";
     const shell = ctx.createLinearGradient(0, railY, 0, railY + railH);
-    shell.addColorStop(0, this.broken ? "#2a1624" : "#24263a");
-    shell.addColorStop(0.5, this.broken ? "#4a1c2d" : "#17182a");
-    shell.addColorStop(1, this.broken ? "#1b101a" : "#0c0d18");
+    if (this.broken) {
+      shell.addColorStop(0, "#3a1b2a");
+      shell.addColorStop(0.52, "#211421");
+      shell.addColorStop(1, "#110c15");
+    } else {
+      shell.addColorStop(0, "#31364d");
+      shell.addColorStop(0.48, "#171b2d");
+      shell.addColorStop(1, "#090b14");
+    }
     ctx.fillStyle = shell;
-    roundedRect(ctx, railX, railY, railW, railH, 3);
+    roundedRect(ctx, margin, railY, railW, railH, 6);
     ctx.fill();
 
     ctx.shadowBlur = 0;
-    ctx.globalAlpha = this.broken ? 0.42 : 0.72;
-    ctx.strokeStyle = this.broken ? "rgba(255,122,141,0.36)" : "rgba(255,255,255,0.14)";
+    ctx.globalAlpha = this.broken ? 0.44 : 0.82;
     ctx.lineWidth = 1;
-    roundedRect(ctx, railX + 0.5, railY + 0.5, railW - 1, railH - 1, 2.5);
+    ctx.strokeStyle = this.broken ? "rgba(255,122,141,0.42)" : "rgba(246,251,255,0.18)";
+    roundedRect(ctx, margin + 0.5, railY + 0.5, railW - 1, railH - 1, 5.5);
     ctx.stroke();
 
-    ctx.globalAlpha = this.broken ? 0.38 + brokenPulse * 0.24 : 0.84;
-    const core = ctx.createLinearGradient(railX, 0, railX + railW, 0);
+    const inset = 4;
+    const coreX = margin + inset;
+    const coreY = railY + inset;
+    const coreW = Math.max(0, railW - inset * 2);
+    const coreH = railH - inset * 2;
+
+    ctx.save();
+    roundedRect(ctx, coreX, coreY, coreW, coreH, 3);
+    ctx.clip();
+    ctx.globalAlpha = this.broken ? 0.28 + pulse * 0.2 : 0.92;
+    ctx.fillStyle = this.broken ? "rgba(255,95,136,0.32)" : "rgba(103,216,255,0.16)";
+    ctx.fillRect(coreX, coreY, coreW, coreH);
+
     if (!this.broken) {
-      core.addColorStop(0, "rgba(74,158,255,0.02)");
-      core.addColorStop(0.16, "rgba(74,158,255,0.62)");
-      core.addColorStop(0.5, "rgba(246,251,255,0.86)");
-      core.addColorStop(0.84, "rgba(124,245,178,0.54)");
-      core.addColorStop(1, "rgba(74,158,255,0.02)");
+      const hpW = Math.max(2, coreW * hpRatio);
+      const hp = ctx.createLinearGradient(coreX, 0, coreX + coreW, 0);
+      hp.addColorStop(0, "rgba(103,216,255,0.78)");
+      hp.addColorStop(0.52, "rgba(246,251,255,0.94)");
+      hp.addColorStop(1, "rgba(124,245,178,0.82)");
+      ctx.fillStyle = hp;
+      ctx.fillRect(coreX, coreY, hpW, coreH);
+      if (hpRatio < 0.995) {
+        ctx.fillStyle = "rgba(4,6,16,0.52)";
+        ctx.fillRect(coreX + hpW, coreY, coreW - hpW, coreH);
+      }
     } else {
-      core.addColorStop(0, "rgba(255,74,74,0)");
-      core.addColorStop(0.5, "rgba(255,74,74,0.7)");
-      core.addColorStop(1, "rgba(255,74,74,0)");
-    }
-    ctx.shadowBlur = this.broken ? 4 : 6 + hit * 8 + revive * 8;
-    ctx.shadowColor = this.broken ? "rgba(255,74,74,0.42)" : "rgba(103,216,255,0.36)";
-    ctx.fillStyle = core;
-    roundedRect(ctx, railX + 5, coreY, railW - 10, 2, 1);
-    ctx.fill();
-
-    ctx.shadowBlur = 0;
-    for (let x = railX + 12; x < railX + railW - 8; x += segment) {
-      ctx.globalAlpha = this.broken ? 0.16 : 0.26;
-      ctx.fillStyle = this.broken ? "rgba(255,122,141,0.58)" : "rgba(255,255,255,0.45)";
-      ctx.fillRect(x, railY + 1.5, 1, railH - 3);
-      if (!this.broken) {
-        ctx.globalAlpha = 0.18;
-        ctx.fillStyle = "rgba(103,216,255,0.62)";
-        roundedRect(ctx, x + 4, railY + 2, Math.max(4, segment - gap - 8), 1.5, 1);
-        ctx.fill();
+      ctx.fillStyle = "rgba(255,95,136,0.32)";
+      for (let x = coreX - 20 + ((now / 55) % 40); x < coreX + coreW; x += 40) {
+        ctx.fillRect(x, coreY, 18, coreH);
       }
     }
+    ctx.restore();
 
-    if (this.broken) {
-      for (let x = railX + 18; x < railX + railW; x += 42) {
-        ctx.globalAlpha = 0.2 + Math.sin(now / 80 + x) * 0.08;
-        ctx.fillStyle = "rgba(255,74,74,0.65)";
-        roundedRect(ctx, x, railY + 2, 18, 2, 1);
+    if (!this.broken) {
+      const segmentCount = Math.max(1, this.maxHp);
+      const gap = 2;
+      const segmentW = Math.max(4, (coreW - gap * (segmentCount - 1)) / segmentCount);
+      for (let i = 0; i < segmentCount; i += 1) {
+        const active = i < this.hp;
+        ctx.globalAlpha = active ? 0.82 : 0.18;
+        ctx.fillStyle = active ? (i % 2 ? accentColor : liveColor) : "rgba(246,251,255,0.38)";
+        roundedRect(ctx, coreX + i * (segmentW + gap), railY - 3, Math.max(2, segmentW), 1.8, 1);
         ctx.fill();
       }
     }
 
     if (!this.broken) {
-      const cursor = railX + 8 + ((now / 18) % Math.max(1, railW - 16));
-      ctx.globalAlpha = 0.32 + hit * 0.28 + revive * 0.24;
-      ctx.fillStyle = "rgba(246,251,255,0.78)";
-      roundedRect(ctx, cursor - 5, railY + 1, 10, railH - 2, 2);
+      const sweep = coreX + ((now / 14) % Math.max(1, coreW + 42)) - 21;
+      ctx.globalAlpha = 0.22 + hit * 0.36 + revive * 0.32;
+      const beam = ctx.createLinearGradient(sweep - 18, 0, sweep + 18, 0);
+      beam.addColorStop(0, "rgba(246,251,255,0)");
+      beam.addColorStop(0.5, "rgba(246,251,255,0.9)");
+      beam.addColorStop(1, "rgba(246,251,255,0)");
+      ctx.fillStyle = beam;
+      roundedRect(ctx, sweep - 18, railY + 1.5, 36, railH - 3, 4);
       ctx.fill();
     }
+
+    ctx.globalAlpha = this.broken ? 0.34 : 0.52;
+    ctx.fillStyle = this.broken ? "rgba(255,95,136,0.66)" : "rgba(246,251,255,0.62)";
+    roundedRect(ctx, margin + 8, railY + 2, 34, 1.4, 1);
+    ctx.fill();
+    roundedRect(ctx, margin + railW - 42, railY + railH - 3.4, 34, 1.4, 1);
+    ctx.fill();
 
     if (this.broken) {
       ctx.globalAlpha = 1;
@@ -239,10 +260,10 @@ class Bumper {
       ctx.textBaseline = "bottom";
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(4, 8, 14, 0.92)";
-      ctx.fillStyle = "#ff7a8d";
+      ctx.fillStyle = dangerColor;
       const text = `BUMPER ${Math.ceil(this.reviveTimer)}s`;
-      ctx.strokeText(text, this.width / 2, -4);
-      ctx.fillText(text, this.width / 2, -4);
+      ctx.strokeText(text, this.width / 2, railY - 4);
+      ctx.fillText(text, this.width / 2, railY - 4);
     }
     ctx.restore();
   }
