@@ -146,6 +146,7 @@ const UI = {
         <div class="title-secondary-buttons">
           <button class="btn-sub" id="btn-ranking">RANKING</button>
           <button class="btn-sub" id="btn-settings">SETTINGS</button>
+          <button class="btn-sub btn-install" id="btn-install" hidden>INSTALL</button>
         </div>
       </div>
       </div>
@@ -160,6 +161,7 @@ const UI = {
     });
     document.getElementById("btn-ranking").addEventListener("click", () => this.showRanking());
     document.getElementById("btn-settings").addEventListener("click", () => this.showSettings());
+    if (typeof PWAInstall !== "undefined") PWAInstall.bindInstallButton(document.getElementById("btn-install"));
   },
 
   updateScreens(state) {

@@ -2827,6 +2827,10 @@ button {
   gap: 8px;
 }
 
+.title-secondary-buttons.install-ready {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .title-shell .btn-sub {
   height: 42px;
   font-size: 11px;

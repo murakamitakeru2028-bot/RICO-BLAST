@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/rico-blast/index.html" },
+    { "source": "/index.html", "destination": "/rico-blast/index.html" },
+    { "source": "/manifest.webmanifest", "destination": "/rico-blast/manifest.webmanifest" },
+    { "source": "/sw.js", "destination": "/rico-blast/sw.js" },
+    { "source": "/assets/(.*)", "destination": "/rico-blast/assets/$1" },
+    { "source": "/css/(.*)", "destination": "/rico-blast/css/$1" },
+    { "source": "/js/(.*)", "destination": "/rico-blast/js/$1" }
+  ]
+}
