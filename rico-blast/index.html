@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>RICO BLAST</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;800&family=Nunito:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+  <div id="screen-title" class="screen active"></div>
+
+  <div id="screen-game" class="screen">
+    <div id="hud-bar">
+      <div id="hud-progress">
+        <div class="hud-progress-row">
+          <span>NEXT SKILL</span>
+          <b id="hud-progress-text">0/30</b>
+        </div>
+        <div class="hud-progress-track">
+          <div id="hud-progress-fill"></div>
+        </div>
+      </div>
+      <span class="hud-stat score-stat"><span class="hud-label">SCORE</span><b id="hud-score">0</b></span>
+      <button id="btn-pause" class="hud-button" type="button">STOP</button>
+    </div>
+    <div id="game-stage">
+      <canvas id="game-canvas"></canvas>
+
+      <div id="screen-skill" class="game-panel">
+        <div class="overlay-panel skill-panel">
+          <p class="overlay-kicker">SKILL READY</p>
+          <h2 class="overlay-title">CHOOSE A SKILL</h2>
+          <div id="skill-cards"></div>
+          <div id="ball-picker"></div>
+          <div id="skill-reroll-row"></div>
+        </div>
+      </div>
+
+      <div id="screen-upgrade" class="game-panel">
+        <div class="overlay-panel upgrade-panel">
+          <p class="overlay-kicker">UPGRADE</p>
+          <div id="upgrade-list"></div>
+          <button id="btn-continue">CONTINUE</button>
+        </div>
+      </div>
+    </div>
+    <div id="screen-gameover" class="game-panel">
+      <div id="gameover-card"></div>
+    </div>
+    <div id="paddle-hp">
+      <span id="hp-token-display">
+        <span>TOKEN</span>
+        <b id="hp-token-count">0</b>
+      </span>
+      <span id="token-gain-text">+0 TOKEN</span>
+      <div id="paddle-hp-meter">
+        <div class="hp-meter-head">
+          <span class="hp-label">PADDLE HP</span>
+          <span id="paddle-hp-text">20 / 20</span>
+        </div>
+        <div id="paddle-hp-track">
+          <div id="paddle-hp-fill"></div>
+        </div>
+      </div>
+    </div>
+    <div id="slot-bar">
+      <div class="slot" id="slot-0"></div>
+      <div class="slot" id="slot-1"></div>
+      <div class="slot" id="slot-2"></div>
+    </div>
+    <div id="paddle-status">
+      <div class="slot" id="slot-paddle"></div>
+      <div class="slot" id="slot-bumper"></div>
+    </div>
+  </div>
+
+  <div id="toast-root" aria-live="polite"></div>
+  <div id="confirm-root" aria-live="polite"></div>
+
+  <script src="js/skills.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/ball.js"></script>
+  <script src="js/block.js"></script>
+  <script src="js/paddle.js"></script>
+  <script src="js/bumper.js"></script>
+  <script src="js/tokens.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
