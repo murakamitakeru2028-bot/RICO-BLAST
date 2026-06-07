@@ -96,7 +96,7 @@ button {
 
 #screen-game.active {
   display: grid;
-  grid-template-rows: 7% 55% 4% 19% 15%;
+  grid-template-rows: 7% 53% 6% 20% 14%;
   align-items: stretch;
   justify-content: stretch;
 }
@@ -2701,7 +2701,7 @@ button {
   left: 11px;
   right: 11px;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 5px;
 }
 
@@ -3139,4 +3139,228 @@ button {
     font-size: 7px;
   }
 
+}
+
+/* Mobile readability pass */
+.hud-progress-row {
+  font-size: 8.5px;
+}
+
+#hud-progress-text {
+  font-size: 9.5px;
+}
+
+.hud-label,
+.score-stat .hud-label {
+  font-size: 8.5px;
+}
+
+.hud-stat b {
+  font-size: 12px;
+}
+
+.score-stat b {
+  font-size: 27px;
+}
+
+.hud-button {
+  font-size: 10px;
+}
+
+.hp-label {
+  font-size: 9px;
+}
+
+#paddle-hp-text {
+  min-width: 80px;
+  font-size: 11px;
+}
+
+#hp-token-display {
+  min-height: 36px;
+}
+
+#hp-token-display span {
+  font-size: 9px;
+}
+
+#hp-token-display b {
+  font-size: 20px;
+}
+
+#token-gain-text {
+  font-size: 14px;
+}
+
+.slot-tag {
+  font-size: 9px;
+}
+
+.slot-name,
+#paddle-status .slot-name {
+  font-size: 13px;
+}
+
+.slot.has-skills .slot-name {
+  font-size: 13.5px;
+}
+
+.slot-detail,
+.slot-skill-count {
+  font-size: 9px;
+}
+
+.slot-skill-list.empty,
+.slot-skill-empty {
+  font-size: 11px;
+}
+
+.slot-price {
+  font-size: 11.5px;
+}
+
+.slot-lock {
+  font-size: 10px;
+}
+
+.slot-skill-chip {
+  height: 20px;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
+}
+
+.slot-skill-text {
+  font-size: 10px;
+}
+
+.slot-skill-level {
+  font-size: 8.5px;
+}
+
+.slot-revive-head {
+  font-size: 8.5px;
+}
+
+.slot-revive-head b {
+  font-size: 12px;
+}
+
+.slot.targetable::after,
+.slot.selected-upgrade::after,
+.slot.selected-skill::after,
+.slot.launch-ready::after {
+  font-size: 8px;
+}
+
+.level-badge-text {
+  font-size: 9px;
+}
+
+#game-stage .overlay-kicker {
+  font-size: 11px;
+}
+
+#game-stage .overlay-title {
+  font-size: 16px;
+}
+
+#game-stage .skill-panel .overlay-kicker {
+  font-size: 9px;
+}
+
+#game-stage .skill-panel .overlay-title {
+  font-size: 14px;
+}
+
+.skill-reroll-status {
+  font-size: 9px;
+}
+
+.skill-reroll-status b {
+  font-size: 16px;
+}
+
+.btn-reroll {
+  font-size: 11px;
+}
+
+.skill-name {
+  font-size: 11.5px;
+}
+
+.skill-stars {
+  font-size: 10px;
+}
+
+.skill-description {
+  font-size: 9.5px;
+  line-height: 1.25;
+  -webkit-line-clamp: 4;
+}
+
+.skill-badge {
+  font-size: 8px;
+}
+
+.target-kicker,
+.target-level-pill,
+.target-selected-pill,
+.target-skill-chip b,
+.target-skill-chip em,
+.ball-target-state {
+  font-size: 8.5px;
+}
+
+.target-title {
+  font-size: 14px;
+}
+
+.ball-target-label,
+.ball-picker-title,
+.ball-pick {
+  font-size: 11px;
+}
+
+.ball-target-name {
+  font-size: 9px;
+}
+
+.upgrade-simple-title b,
+.upgrade-name {
+  font-size: 12.5px;
+}
+
+.upgrade-simple-title em,
+.upgrade-gauge,
+.upgrade-cost,
+.upgrade-value {
+  font-size: 10px;
+}
+
+.upgrade-target-choice-label,
+.upgrade-target-choice-state,
+.btn-buy,
+#game-stage .btn-buy,
+.btn-carve,
+#game-stage .btn-carve,
+#btn-continue,
+#game-stage #btn-continue {
+  font-size: 11px;
+}
+
+.btn-start {
+  font-size: 16px;
+}
+
+.btn-sub,
+.title-shell .btn-sub {
+  font-size: 12px;
+}
+
+.confirm-title {
+  font-size: 15px;
+}
+
+.confirm-message,
+.confirm-actions button {
+  font-size: 13px;
 }

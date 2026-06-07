@@ -300,7 +300,7 @@ const Game = {
   },
 
   getBlockLayout() {
-    const cols = 6;
+    const cols = 5;
     const gap = 6;
     const targetPadding = 12;
     const available = this.width - targetPadding * 2 - gap * (cols - 1);
@@ -477,7 +477,7 @@ const Game = {
   },
 
   getMaxActiveBlocks() {
-    return 72;
+    return 60;
   },
 
   getBaseBlockHp(level = 1) {

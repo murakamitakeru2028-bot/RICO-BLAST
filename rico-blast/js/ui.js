@@ -127,7 +127,7 @@ const UI = {
         <div class="title-preview-grid">
           <span></span><span></span><span></span><span></span><span></span><span></span>
           <span></span><span></span><span></span><span></span><span></span><span></span>
-          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span>
         </div>
         <div class="title-preview-ball ball-a"></div>
         <div class="title-preview-ball ball-b"></div>
