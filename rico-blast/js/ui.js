@@ -1,5 +1,4 @@
 const SLOT_SKILL_LABELS = {
-  homing: "HOMING",
   penetration: "PIERCE",
   immortality: "IMMORTAL",
   sprint: "SPRINT",
@@ -8,13 +7,11 @@ const SLOT_SKILL_LABELS = {
   spread: "SPREAD",
   chain: "CHAIN",
   sniper: "SNIPER",
-  magnetism: "MAGNET",
   doubleChance: "DOUBLE",
   crossfire: "CROSS",
   overload: "OVERLOAD",
   fragment: "FRAG",
   detonator: "DETONATE",
-  shatter: "SHATTER",
   poison: "POISON",
   afterburn: "BURN",
   lightning: "LIGHTNING",
@@ -24,7 +21,6 @@ const SLOT_SKILL_LABELS = {
   mirror: "MIRROR",
   rebound: "REBOUND",
   echo: "ECHO",
-  focus: "FOCUS",
   phantom: "PHANTOM",
   aura: "AURA",
   berserker: "BERSERK",
@@ -44,7 +40,6 @@ const SLOT_SKILL_LABELS = {
 };
 
 const SKILL_DETAIL_TEXT = {
-  homing: "一番近いブロックへ少しずつ軌道を寄せる。★が高いほど補正が強く、狙いが外れにくい。",
   penetration: "発射ごとに★回ぶん反射せず貫通する。密集した列を削りながらコンボを伸ばしやすい。",
   immortality: "落下しても一定回数だけ復帰する。★3以上は復帰直後に短時間ダメージも上がる。",
   sprint: "パドルで打ち返した直後だけ加速する。★が高いほど速度が伸び、次のヒットへ早く届く。",
@@ -53,13 +48,11 @@ const SKILL_DETAIL_TEXT = {
   spread: "落下直前に扇状の分裂弾を出す。★が高いほど弾数と追撃ダメージが増える。",
   chain: "破壊したブロックから近くのブロックへ連鎖ダメージ。★が高いほど連鎖回数が増える。",
   sniper: "破壊時に同じ縦列へ追加ダメージ。★5では横方向にも判定が広がりやすい。",
-  magnetism: "ヒット後の小弾が周囲ブロックへ向かう。★が高いほど狙う数と追撃ダメージが増える。",
   doubleChance: "ヒット時に追加ダメージがもう一度入ることがある。★が高いほど発動率が上がる。",
   crossfire: "破壊時に左右へ貫通弾を放つ。横並びのブロックを削り、列崩しに強い。",
   overload: "同じブロックに連続ヒットするほど火力上昇。高HPブロックを一点突破しやすい。",
   fragment: "破壊時に複数の欠片弾を飛ばす。★が高いほど欠片の数とダメージが増える。",
   detonator: "3ヒットごとに小さな爆発を起こす。連続ヒットや貫通と合わせると発動しやすい。",
-  shatter: "弱った近くのブロックへ自動追撃する。残りHPの少ないブロック処理に向く。",
   poison: "壊しきれなかったブロックに毒を付与する。★が高いほど継続ダメージが強く長くなる。",
   afterburn: "破壊位置に炎のダメージゾーンを残す。通過弾の追撃と合わせて周囲を削る。",
   lightning: "破壊時に近くのブロックへ電撃が飛ぶ。★が高いほど連鎖数と届く範囲が伸びる。",
@@ -69,7 +62,6 @@ const SKILL_DETAIL_TEXT = {
   mirror: "反対軌道へ分身弾を周期的に出す。★が高いほど発射間隔が短く追撃が増える。",
   rebound: "パドルで打ち返すたび次のヒットが強化される。守りながら火力を溜められる。",
   echo: "移動軌道に残像ダメージを残す。★が高いほど残像が太く長く残り、通路を削る。",
-  focus: "最大HPのブロックへ軌道を寄せる。硬いブロックを優先して処理したい時に強い。",
   phantom: "落下時に直前の軌道から残像弾を撃つ。★が高いほど往復数と追撃火力が増える。",
   aura: "ボール周辺へ短い間隔で小ダメージ。接触しなくても近いブロックをじわじわ削る。",
   berserker: "復活直後に一定時間だけ速度とダメージが上がる。★が高いほど効果時間と火力が伸びる。",
@@ -92,6 +84,15 @@ const UI = {
   selectedUpgradeTarget: null,
   selectedSkillTarget: null,
   upgradeContext: null,
+
+  handlePlayingUiLaunch(ball = null) {
+    if (typeof Game === "undefined" || typeof currentState === "undefined" || currentState !== STATE.PLAYING) {
+      return false;
+    }
+    if (ball && ball.waitingLaunch && Game.launchReadyBall(ball)) return true;
+    Game.launchNextReadyBall();
+    return true;
+  },
 
   initTitle() {
     const title = document.getElementById("screen-title");
@@ -189,15 +190,25 @@ const UI = {
         const buyState = this.getBallPurchaseSlotState(i, balls);
         slot.className = `slot empty ${buyState.buyable ? "buyable" : ""} ${buyState.locked ? "locked" : ""}`;
         slot.style.borderColor = "";
+        slot.style.removeProperty("--selected-color");
+        slot.style.removeProperty("--primary-skill-color");
+        slot.style.removeProperty("--revive-fill");
+        const emptyRows = `
+          <div class="skill-row empty"><span class="skill-row-name">------</span></div>
+          <div class="skill-row empty"><span class="skill-row-name">------</span></div>
+          <div class="skill-row empty"><span class="skill-row-name">------</span></div>
+        `;
         slot.innerHTML = `
           <div class="slot-top">
-            <div class="slot-icon" style="background:rgba(255,255,255,0.18);box-shadow:none"></div>
+            <div class="slot-icon"></div>
             <div class="slot-tag">BALL ${i + 1}</div>
           </div>
-          <div class="slot-name">${buyState.label}</div>
-          <div class="slot-skill-list empty">${buyState.detail}</div>
+          <div class="slot-skills-stack">${emptyRows}</div>
         `;
-        slot.onclick = () => this.handleEmptyBallSlotClick(i);
+        slot.onclick = () => {
+          if (this.handlePlayingUiLaunch()) return;
+          this.handleEmptyBallSlotClick(i);
+        };
         continue;
       }
 
@@ -205,52 +216,48 @@ const UI = {
         (isSkillSelect && this.isSkillTargetSelected(i));
       const first = ball.skills[0];
       const color = first ? first.color : ball.color;
-      const skillList = ball.skills.length
-        ? ball.skills.map((skill, skillIndex) => this.slotSkillChip(skill, skillIndex)).join("")
-        : `<span class="slot-skill-empty">NO SKILL</span>`;
       const launchReady = ball.waitingLaunch;
       const reviveRemaining = Math.max(0, ball.reviveTimer || 0);
       const reviveTotal = Math.max(reviveRemaining, ball.getReviveTime ? ball.getReviveTime(Game) : reviveRemaining, 1);
-      const reviveProgress = clamp(1 - reviveRemaining / reviveTotal, 0, 1);
-      const slotName = launchReady
-        ? "READY"
-        : ball.alive
-          ? (first ? this.skillFullName(first) : "NO SKILL")
-          : "REVIVE";
-      const skillCount = ball.skills.length ? `<div class="slot-detail slot-skill-count">${ball.skills.length}/3 ACTIVE SKILLS</div>` : "";
-      const slotBody = launchReady
-        ? `<span class="slot-skill-empty">TAP TO LAUNCH</span>`
-        : ball.alive
-          ? `<div class="slot-skill-list-inner">${skillList}</div>`
-          : `
-            <div class="slot-revive">
-              <div class="slot-revive-head">
-                <span>RECOVERING</span>
-                <b>${reviveRemaining.toFixed(1)}s</b>
-              </div>
-              <div class="slot-revive-track">
-                <div class="slot-revive-fill" style="width:${Math.round(reviveProgress * 100)}%"></div>
-              </div>
-            </div>
+      const reviveFill = clamp(1 - reviveRemaining / reviveTotal, 0, 1);
+
+      // 3スキル行を生成（装備済み・リバイブ中・空スロット対応）
+      const skillRowsHtml = (() => {
+        if (!ball.alive) {
+          return `
+            <div class="skill-row revive"><span class="skill-row-name">${reviveRemaining.toFixed(1)}s</span></div>
+            <div class="skill-row empty"><span class="skill-row-name">------</span></div>
+            <div class="skill-row empty"><span class="skill-row-name">------</span></div>
           `;
-      slot.className = `slot ${ball.alive || launchReady ? "" : "fallen"} ${ball.skills.length ? "has-skills" : "empty"} ${launchReady ? "launch-ready" : ""} ${selected ? (isSkillSelect ? "selected-skill" : "selected-upgrade") : ""}`;
-      slot.style.borderColor = first ? first.color : "";
+        }
+        return Array.from({ length: 3 }, (_, idx) => {
+          const skill = ball.skills[idx];
+          if (skill) {
+            return `<div class="skill-row equipped" style="--skill-color:${skill.color}"><span class="skill-row-name">${this.skillDisplayName(skill)} ★${skill.level}</span></div>`;
+          }
+          return `<div class="skill-row empty"><span class="skill-row-name">------</span></div>`;
+        }).join("");
+      })();
+
+      // ボール状態のタグ（READY表示）
+      const ballTag = launchReady
+        ? `BALL ${i + 1} ▶`
+        : `BALL ${i + 1}`;
+
+      slot.className = `slot owned ${ball.alive || launchReady ? "" : "fallen reviving"} ${ball.skills.length ? "has-skills" : "no-skills"} ${launchReady ? "launch-ready" : ""} ${selected ? (isSkillSelect ? "selected-skill" : "selected-upgrade") : ""}`;
+      slot.style.borderColor = first ? first.color : ball.color;
       slot.style.setProperty("--selected-color", color || "#4a9eff");
       slot.style.setProperty("--primary-skill-color", color || "#4a9eff");
+      slot.style.setProperty("--revive-fill", `${Math.round(reviveFill * 100)}%`);
       slot.innerHTML = `
         <div class="slot-top">
           <div class="slot-icon" style="${this.ballIconStyle(ball)}"></div>
-          <div class="slot-tag">BALL ${i + 1}</div>
+          <div class="slot-tag">${ballTag}</div>
         </div>
-        <div class="slot-name">${slotName}</div>
-        ${skillCount}
-        <div class="slot-skill-list ${ball.skills.length ? "has-skills" : ""}">${slotBody}</div>
+        <div class="slot-skills-stack">${skillRowsHtml}</div>
       `;
       slot.onclick = () => {
-        if (launchReady && typeof Game !== "undefined" && typeof currentState !== "undefined" && currentState === STATE.PLAYING) {
-          Game.launchReadyBall(ball);
-          return;
-        }
+        if (this.handlePlayingUiLaunch(ball)) return;
         if (isUpgrade) {
           this.selectUpgradeTarget("ball", i);
           return;
@@ -268,18 +275,17 @@ const UI = {
     const firstPaddle = paddle.skills[0];
     const total = Math.min(5, getTotalStars(paddle));
     const paddleSelected = isUpgrade && this.isUpgradeTargetSelected("paddle");
-    paddleSlot.className = `slot ${paddle.skills.length ? "" : "empty"} ${paddleSelected ? "selected-upgrade" : ""}`;
-    paddleSlot.style.borderColor = firstPaddle ? firstPaddle.color : "";
+    paddleSlot.className = `slot ${paddle.skills.length ? "has-skills" : "empty"} ${paddleSelected ? "selected-upgrade" : ""}`;
+    paddleSlot.style.borderColor = "";
     paddleSlot.style.setProperty("--selected-color", firstPaddle ? firstPaddle.color : "#f6fbff");
     paddleSlot.innerHTML = `
       <div class="slot-paddle-icon"></div>
-      <div>
-        <div class="slot-tag">PADDLE</div>
-        <div class="slot-name">${firstPaddle ? this.skillDisplayName(firstPaddle) : "NO SKILL"}</div>
-      </div>
-      <div class="slot-stars">${makeStars(total)}</div>
+      <span class="slot-tag">PADDLE</span>
+      <span class="slot-name">${firstPaddle ? this.skillDisplayName(firstPaddle) : "NO SKILL"}</span>
+      <span class="slot-lv">★${total}</span>
     `;
     paddleSlot.onclick = () => {
+      if (this.handlePlayingUiLaunch()) return;
       if (isUpgrade) {
         this.selectUpgradeTarget("paddle");
         return;
@@ -308,20 +314,30 @@ const UI = {
         `<span class="${owned && index < hp && !broken ? "on" : ""}"></span>`
       )).join("");
       const bumperSelected = isUpgrade && this.isUpgradeTargetSelected("bumper");
-      bumperSlot.className = `slot ${owned ? "" : "empty"} ${broken ? "fallen" : ""} ${buyState.buyable ? "buyable" : ""} ${buyState.locked ? "locked" : ""} ${bumperSelected ? "selected-upgrade" : ""}`;
-      bumperSlot.style.borderColor = firstBumper ? firstBumper.color : "";
+      bumperSlot.className = `slot ${owned ? "has-skills" : ""} ${broken ? "fallen" : ""} ${buyState.buyable ? "buyable" : ""} ${buyState.locked ? "locked" : ""} ${bumperSelected ? "selected-upgrade" : ""}`;
+      bumperSlot.style.borderColor = "";
       bumperSlot.style.setProperty("--selected-color", firstBumper ? firstBumper.color : "#67d8ff");
-      bumperSlot.innerHTML = `
-        <div class="slot-bumper-icon ${owned ? "" : "empty"}"></div>
-        <div class="slot-copy">
-          <div class="slot-tag">BUMPER</div>
-          <div class="slot-name">${broken ? seconds : buyState.label}</div>
-          <div class="slot-detail">${broken ? "REVIVING" : detailLabel}</div>
-        </div>
-        <div class="bumper-dots ${owned ? "" : "empty"}">${dots}</div>
-        <div class="slot-stars">${makeStars(bumperStars, 10)}</div>
-      `;
+      if (!owned) {
+        // ロック中: シンプルな表示
+        bumperSlot.innerHTML = `
+          <div class="slot-bumper-icon empty"></div>
+          <span class="slot-tag">BUMPER</span>
+          <span class="slot-name">LOCKED</span>
+        `;
+      } else {
+        // 所有済み: アイコン + BUMPER + HPドット + スキル名
+        const compactDots = Array.from({ length: Math.max(1, maxHp) }, (_, index) => (
+          `<span class="${index < hp && !broken ? "on" : ""}"></span>`
+        )).join("");
+        bumperSlot.innerHTML = `
+          <div class="slot-bumper-icon"></div>
+          <span class="slot-tag">BUMPER</span>
+          <div class="bumper-dots-compact">${compactDots}</div>
+          <span class="slot-name">${broken ? `${seconds} REVIVING` : skillLabel}</span>
+        `;
+      }
       bumperSlot.onclick = () => {
+        if (this.handlePlayingUiLaunch()) return;
         if (isUpgrade) {
           this.selectUpgradeTarget("bumper");
           return;
@@ -441,6 +457,58 @@ const UI = {
   skillDescription(choice) {
     if (!choice) return "";
     return SKILL_DETAIL_TEXT[choice.id] || choice.description || "";
+  },
+
+  skillLevelText(choice, level = 1) {
+    if (!choice) return "";
+    const id = choice.id;
+    const p = (value) => `${Math.round((value || 0) * 100)}%`;
+    const n = (value, suffix = "") => {
+      if (value === Infinity) return `全体${suffix}`;
+      return `${Number.isInteger(value) ? value : Number(value).toFixed(1).replace(/\.0$/, "")}${suffix}`;
+    };
+    const v = (key, fallback = 0) => skillParam(id, level, key, fallback);
+    switch (id) {
+      case "penetration": return `${level}枚まで貫通`;
+      case "splash": return `半径${v("radius")} / HP${p(v("damage"))}`;
+      case "spread": return `${v("count")}発 / 各HP${p(v("damage"))}`;
+      case "chain": return `${v("count")}連鎖 / 各HP${p(v("damage"))}`;
+      case "sniper": return `${v("limit", 3) === Infinity ? "縦列全体" : `上${v("limit", 3)}個`} / HP${p(v("damage"))}`;
+      case "doubleChance": return `${p(v("chance"))}発動 / 追加${p(v("damageMultiplier"))}`;
+      case "crossfire": return `左右${v("countPerSide")}発 / 貫通${v("pierce")} / HP${p(v("damage"))}`;
+      case "overload": return `1+n×${n(v("step"))}倍 / 上限${n(v("cap"))}倍`;
+      case "fragment": return `${v("count")}発 / 各HP${p(v("damage"))}`;
+      case "detonator": return `${v("hits")}ヒット毎 / 半径${v("radius")} / HP${p(v("damage"))}`;
+      case "poison": return `${v("duration")}秒 / 0.5秒毎HP${p(v("damage"))}`;
+      case "afterburn": return `半径${v("radius")} / ${v("duration")}秒 / HP${p(v("damage"))}`;
+      case "lightning": return `${v("count")}体 / 半径${v("radius")} / HP${p(v("damage"))}`;
+      case "blast": return `高さ${v("height")} / HP${p(v("damage"))}`;
+      case "impact": return `初撃${n(v("multiplier"))}倍`;
+      case "crash": return `速度火力${n(v("normalMultiplier"))}倍 / 上限${n(v("cap"))}倍`;
+      case "sprint": return `${n(v("duration"), "秒")} / 速度${n(v("speedMultiplier"))}倍`;
+      case "teleporter": return `${p(v("chance"))}でワープ`;
+      case "immortality": return `${v("saves")}回復帰 / ${n(v("boostMultiplier"))}倍${n(v("boostDuration"), "秒")}`;
+      case "mirror": return `${n(v("interval"), "秒")}毎 / HP${p(v("damage"))}`;
+      case "rebound": return `打ち返し後${n(v("multiplier"))}倍`;
+      case "phantom": return `${v("count")}発 / HP${p(v("damage"))}`;
+      case "aura": return `半径${v("radius")} / 0.1秒毎HP${p(v("damage"))}`;
+      case "berserker": return `${v("duration")}秒 / 速度${n(v("speedMultiplier"))}倍 / 火力${n(v("damageMultiplier"))}倍`;
+      case "cycle": return `${v("interval")}秒ごと / 最大火力${n(v("damageMultiplier"))}倍`;
+      case "expert": return `平均Lvごと+${p(v("perAverageLevel"))}`;
+      case "echo": return `半径${v("radius")} / ${v("duration")}秒 / HP${p(v("damage"))}`;
+      case "lastHit": return `撃破+${v("fixedBonus")} + HP/${v("hpDivisor")}`;
+      case "scoreBoost": return `撃破スコア${n(v("multiplier"))}倍`;
+      case "vampire": return `撃破時HP${p(v("percent"))}吸収`;
+      case "paddleWidth": return `パドル幅${v("width")}`;
+      case "bounceHeal": return `反射ごとHP${p(v("percent"))}回復`;
+      case "reviveBoost": return `復活${n(v("seconds"), "秒")}短縮`;
+      case "superBounce": return `${p(v("chance"))} / ${n(v("duration"), "秒")} / ${n(v("damageMultiplier"))}倍`;
+      case "globalDamage": return `全ボール火力${n(v("multiplier"))}倍`;
+      case "globalSpeed": return `全ボール速度${n(v("multiplier"))}倍`;
+      case "bumperFortify": return `バンパーHP${v("hp")}`;
+      case "bumperRecover": return `復活${n(v("seconds"), "秒")}`;
+      default: return choice.description || "";
+    }
   },
 
   updatePaddleHp(paddle) {
@@ -577,17 +645,27 @@ const UI = {
   skillCardHtml(choice) {
     const isAdd = choice.type === "addBall";
     const description = this.skillDescription(choice);
+    const level = clamp(choice.level || 1, 1, 5);
+    const currentText = isAdd ? "新しいボールを追加して同時攻撃数を増やす" : this.skillLevelText(choice, level);
+    const maxText = isAdd ? `最大${BALL_MAX}個まで所持可能` : this.skillLevelText(choice, 5);
+    const category = isAdd ? "NEW BALL" : choice.category.toUpperCase();
     return `
       <button class="skill-card ${isAdd ? "add-ball" : ""}" style="--skill-color:${choice.color}" type="button">
-        <span class="skill-icon" style="background:${choice.color};box-shadow:none"></span>
+        <span class="skill-card-head">
+          <span class="skill-icon" style="background:${choice.color};box-shadow:none"></span>
+          <span class="skill-badge">${category}</span>
+        </span>
         <span class="skill-copy">
           <span class="skill-name-row">
             <span class="skill-name">${choice.name}</span>
-            <span class="skill-stars">${makeStars(choice.level || 1)}</span>
+            <span class="skill-stars">${makeStars(level)}</span>
           </span>
           <span class="skill-description">${description}</span>
+          <span class="skill-effect-lines">
+            <span><b>効果</b><em>${currentText}</em></span>
+            <span><b>★5</b><em>${maxText}</em></span>
+          </span>
         </span>
-        ${isAdd ? `<span class="skill-badge">NEW</span>` : `<span class="skill-badge">${choice.category.toUpperCase()}</span>`}
       </button>
     `;
   },

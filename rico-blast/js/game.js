@@ -10,6 +10,7 @@ const Game = {
   score: 0,
   tokens: 0,
   combo: 0,
+  comboHudValue: 0,
   blocksPerSkill: 30,
   blocksTowardSkill: 0,
   totalBlocksDestroyed: 0,
@@ -19,6 +20,7 @@ const Game = {
   tokenGainTimeout: null,
   lastReadyLaunchAt: 0,
   lastTime: 0,
+  playTime: 0,
   balls: [],
   blocks: [],
   paddle: new Paddle(),
@@ -63,6 +65,7 @@ const Game = {
     const hpTokenDisplay = document.getElementById("hp-token-display");
     if (hpTokenDisplay) hpTokenDisplay.classList.remove("pulse");
     this.lastTime = 0;
+    this.playTime = 0;
     this.paused = false;
     this.awaitingStartClick = false;
     this.grantInvincibleOnStartClick = false;
@@ -153,9 +156,10 @@ const Game = {
     };
 
     bindInputZone(this.canvas, { launch: true, prevent: true });
-    bindInputZone(document.getElementById("paddle-hp"));
-    bindInputZone(document.getElementById("slot-bar"));
-    bindInputZone(document.getElementById("paddle-status"));
+    bindInputZone(document.getElementById("hud-bar"), { launch: true });
+    bindInputZone(document.getElementById("paddle-hp"), { launch: true });
+    bindInputZone(document.getElementById("slot-bar"), { launch: true });
+    bindInputZone(document.getElementById("paddle-status"), { launch: true });
     this.inputReady = true;
   },
 
@@ -163,7 +167,15 @@ const Game = {
     if (this.hudReady) return;
     const pauseButton = document.getElementById("btn-pause");
     if (pauseButton) {
-      pauseButton.addEventListener("click", () => this.togglePause());
+      pauseButton.addEventListener("click", (event) => {
+        if (currentState === STATE.PLAYING) {
+          event.preventDefault();
+          this.releaseStartClickHold();
+          this.launchNextReadyBall();
+          return;
+        }
+        this.togglePause();
+      });
     }
     this.hudReady = true;
   },
@@ -199,7 +211,7 @@ const Game = {
     this.bumper.reset(this.width, this.height);
     for (let i = 0; i < this.balls.length; i += 1) {
       const ball = this.balls[i];
-      ball.color = ball.skills.length > 0 ? (BALL_COLORS[i] || "#ffffff") : "#ffffff";
+      ball.color = BALL_COLORS[i] || "#ffffff";
       ball.launch(this.paddle.x + this.paddle.getWidth() / 2, this.paddle.y - 12);
     }
     this.grantResumeInvincibility();
@@ -226,7 +238,7 @@ const Game = {
     this.bumper.reset(this.width, this.height);
     for (let i = 0; i < this.balls.length; i += 1) {
       const ball = this.balls[i];
-      ball.color = ball.skills.length > 0 ? (BALL_COLORS[i] || "#ffffff") : "#ffffff";
+      ball.color = BALL_COLORS[i] || "#ffffff";
       ball.readyOnPaddle(this);
     }
     this.holdUntilStartClick({ grantInvincible: true });
@@ -385,6 +397,7 @@ const Game = {
       UI.renderSlots(this.balls, this.paddle);
       return;
     }
+    this.playTime += dt;
     this.updateResumeInvincibility(dt);
     this.paddle.update(this, dt);
     this.bumper.update(this, dt);
@@ -582,7 +595,7 @@ const Game = {
     this.bumper.draw(ctx);
     for (const ball of this.balls) ball.draw(ctx);
     Effects.draw(ctx);
-    this.drawCombo(ctx);
+    this.updateComboHud();
   },
 
   drawBackground(ctx) {
@@ -726,14 +739,17 @@ const Game = {
     AudioSystem.playBlockBreak(block.isSpecial, this.combo, block.effect);
     if (block.isSpecial) Effects.shakeScreen(3, 0.2);
     const lastHit = sourceBall ? getSkillLevel(sourceBall, "lastHit") : 0;
-    const tokenAmount = block.getTokenDropAmount(sourceBall, lastHit > 0 ? lastHit * 5 : 0);
+    const lastHitBonus = lastHit > 0
+      ? skillParam("lastHit", lastHit, "fixedBonus", 0) + Math.floor(block.maxHp / skillParam("lastHit", lastHit, "hpDivisor", 10))
+      : 0;
+    const tokenAmount = block.getTokenDropAmount(sourceBall, lastHitBonus);
     this.addTokens(tokenAmount);
     TokenManager.spawn(block.cx, block.cy, tokenAmount, this);
     Effects.spawnTokenCollect(block.cx, block.cy, Math.min(5, Math.max(1, Math.ceil(tokenAmount / 10))));
 
     const vampire = sourceBall ? getSkillLevel(sourceBall, "vampire") : 0;
     if (vampire > 0) {
-      const recovery = Math.max(1, Math.floor(block.maxHp * vampire / 100));
+      const recovery = Math.max(1, Math.floor(block.maxHp * skillParam("vampire", vampire, "percent", 0)));
       this.healPaddle(recovery, this.paddle.x + this.paddle.getWidth() / 2, this.paddle.y);
     }
 
@@ -845,7 +861,8 @@ const Game = {
     const paddlelessMultiplier = source === "ball" ? this.getPaddlelessScoreMultiplier(sourceBall) : 1;
     let points = block.maxHp * this.difficultyLevel * comboMultiplier;
     points *= paddlelessMultiplier;
-    if (sourceBall) points *= 1 + getSkillLevel(sourceBall, "scoreBoost") * 0.15;
+    const scoreBoost = sourceBall ? getSkillLevel(sourceBall, "scoreBoost") : 0;
+    if (scoreBoost > 0) points *= skillParam("scoreBoost", scoreBoost, "multiplier", 1);
     return points;
   },
 
@@ -860,50 +877,59 @@ const Game = {
     const cycleSplash = ball.cycleEffect === "splash" ? 1 : 0;
     const splash = Math.max(getSkillLevel(ball, "splash"), cycleSplash);
     if (splash > 0) {
-      this.applyAreaDamage(block.cx, block.cy, 30 + splash * 10, ball.getSkillDamage(this, splash, "area"), ball, block, "splash", depth + 1);
+      const cycle = getSkillLevel(ball, "cycle");
+      const damage = cycleSplash
+        ? (target) => skillDamageByMaxHp(target, "cycle", cycle, "splashDamage")
+        : (target) => skillDamageByMaxHp(target, "splash", splash);
+      this.applyAreaDamage(block.cx, block.cy, skillParam("splash", splash, "radius", 30), damage, ball, block, "splash", depth + 1);
     }
 
     const chain = getSkillLevel(ball, "chain");
     if (chain > 0) {
       let origin = block;
       const visited = new Set([block.id]);
-      for (let i = 0; i < chain; i += 1) {
+      for (let i = 0; i < skillParam("chain", chain, "count", chain); i += 1) {
         const target = this.findNearestBlock(origin.cx, origin.cy, visited);
         if (!target) break;
         visited.add(target.id);
-        this.damageBlock(target, ball.getSkillDamage(this, chain, "chain"), ball, "chain", depth + 1);
+        this.damageBlock(target, skillDamageByMaxHp(target, "chain", chain), ball, "chain", depth + 1);
         origin = target;
       }
     }
 
     const sniper = getSkillLevel(ball, "sniper");
     if (sniper > 0) {
-      for (const target of [...this.blocks]) {
-        const sameColumn = Math.abs(target.cx - block.cx) < block.width * 0.65;
-        const sameRow = sniper >= 5 && Math.abs(target.cy - block.cy) < block.height * 1.2;
-        if (sameColumn || sameRow) this.damageBlock(target, ball.getSkillDamage(this, sniper, "sniper"), ball, "sniper", depth + 1);
+      const sameColumn = [...this.blocks]
+        .filter((target) => Math.abs(target.cx - block.cx) < block.width * 0.65)
+        .sort((a, b) => b.cy - a.cy);
+      const columnTargets = sniper <= 2
+        ? sameColumn.filter((target) => target.cy < block.cy).slice(0, skillParam("sniper", sniper, "limit", 3))
+        : sameColumn;
+      const targets = new Set(columnTargets);
+      if (skillParam("sniper", sniper, "cross", false)) {
+        for (const target of this.blocks) {
+          if (Math.abs(target.cy - block.cy) < block.height * 1.2) targets.add(target);
+        }
       }
-    }
-
-    const magnetism = getSkillLevel(ball, "magnetism");
-    if (magnetism > 0) {
-      const damage = ball.getSkillDamage(this, magnetism, "projectile");
-      for (const target of this.getNearestBlocks(block.cx, block.cy, 2 + magnetism)) {
-        this.spawnProjectile(block.cx, block.cy, target.cx, target.cy, 7, damage, ball, SKILLS.magnetism.color, 0);
-      }
+      for (const target of targets) this.damageBlock(target, skillDamageByMaxHp(target, "sniper", sniper), ball, "sniper", depth + 1);
     }
 
     const crossfire = getSkillLevel(ball, "crossfire");
     if (crossfire > 0) {
-      const damage = ball.getSkillDamage(this, crossfire, "projectile");
-      this.spawnProjectile(block.cx, block.cy, -1, 0, 7, damage, ball, SKILLS.crossfire.color, 2 + crossfire, true);
-      this.spawnProjectile(block.cx, block.cy, 1, 0, 7, damage, ball, SKILLS.crossfire.color, 2 + crossfire, true);
+      const count = skillParam("crossfire", crossfire, "countPerSide", 1);
+      const pierce = skillParam("crossfire", crossfire, "pierce", 2);
+      const damage = (target) => skillDamageByMaxHp(target, "crossfire", crossfire);
+      for (let i = 0; i < count; i += 1) {
+        const spread = count === 1 ? 0 : (i - 0.5) * 0.16;
+        this.spawnProjectile(block.cx, block.cy, -1, spread, 7, damage, ball, SKILLS.crossfire.color, pierce, true);
+        this.spawnProjectile(block.cx, block.cy, 1, spread, 7, damage, ball, SKILLS.crossfire.color, pierce, true);
+      }
     }
 
     const fragment = getSkillLevel(ball, "fragment");
     if (fragment > 0) {
-      const damage = ball.getSkillDamage(this, fragment, "shard");
-      for (let i = 0; i < 3 + fragment; i += 1) {
+      const damage = (target) => skillDamageByMaxHp(target, "fragment", fragment);
+      for (let i = 0; i < skillParam("fragment", fragment, "count", 3); i += 1) {
         const angle = rand(0, Math.PI * 2);
         this.spawnProjectile(block.cx, block.cy, Math.cos(angle), Math.sin(angle), 5.5, damage, ball, SKILLS.fragment.color, 0, true);
       }
@@ -911,10 +937,17 @@ const Game = {
 
     const lightning = Math.max(getSkillLevel(ball, "lightning"), ball.cycleEffect === "lightning" ? 1 : 0);
     if (lightning > 0) {
-      const targets = this.getNearestBlocks(block.cx, block.cy, lightning).filter((target) =>
-        distance(block.cx, block.cy, target.cx, target.cy) < 110 + lightning * 20
+      const cycleLightning = ball.cycleEffect === "lightning" ? 1 : 0;
+      const cycle = getSkillLevel(ball, "cycle");
+      const targets = this.getNearestBlocks(block.cx, block.cy, skillParam("lightning", lightning, "count", lightning)).filter((target) =>
+        distance(block.cx, block.cy, target.cx, target.cy) < skillParam("lightning", lightning, "radius", 100)
       );
-      for (const target of targets) this.damageBlock(target, ball.getSkillDamage(this, lightning, "chain"), ball, "lightning", depth + 1);
+      for (const target of targets) {
+        const damage = cycleLightning
+          ? skillDamageByMaxHp(target, "cycle", cycle, "lightningDamage")
+          : skillDamageByMaxHp(target, "lightning", lightning);
+        this.damageBlock(target, damage, ball, "lightning", depth + 1);
+      }
     }
 
     const afterburn = getSkillLevel(ball, "afterburn");
@@ -923,11 +956,11 @@ const Game = {
         kind: "afterburn",
         x: block.cx,
         y: block.cy,
-        radius: 22 + afterburn * 4,
-        life: 3 + afterburn,
-        maxLife: 3 + afterburn,
-        damage: ball.getSkillDamage(this, afterburn, "dot"),
-        tick: 0.35,
+        radius: skillParam("afterburn", afterburn, "radius", 25),
+        life: skillParam("afterburn", afterburn, "duration", 3),
+        maxLife: skillParam("afterburn", afterburn, "duration", 3),
+        damage: (target) => skillDamageByMaxHp(target, "afterburn", afterburn),
+        tick: 0.5,
         tickTimer: 0,
         color: SKILLS.afterburn.color,
         sourceBall: ball
@@ -936,13 +969,14 @@ const Game = {
 
     const blast = getSkillLevel(ball, "blast");
     if (blast > 0) {
-      const damage = ball.getSkillDamage(this, blast, "line");
+      const height = skillParam("blast", blast, "height", 6);
+      const damage = (target) => skillDamageByMaxHp(target, "blast", blast);
       this.addZone({
         kind: "blast",
         x: 0,
         y: block.cy,
         width: this.width,
-        height: 8 + blast * 2,
+        height,
         life: 0.3,
         maxLife: 0.3,
         damage,
@@ -950,7 +984,7 @@ const Game = {
         sourceBall: ball,
         spent: false
       });
-      this.applyLineDamage(block.cy, 8 + blast * 2, damage, ball, "blast", depth + 1);
+      this.applyLineDamage(block.cy, height, damage, ball, "blast", depth + 1);
     }
   },
 
@@ -958,14 +992,18 @@ const Game = {
     for (const block of [...this.blocks]) {
       if (excludedBlock && block.id === excludedBlock.id) continue;
       const reach = radius + Math.max(block.width, block.height) * 0.5;
-      if (distance(x, y, block.cx, block.cy) <= reach) this.damageBlock(block, damage, sourceBall, source, depth);
+      if (distance(x, y, block.cx, block.cy) <= reach) {
+        const amount = typeof damage === "function" ? damage(block) : damage;
+        this.damageBlock(block, amount, sourceBall, source, depth);
+      }
     }
   },
 
   applyLineDamage(y, height, damage, sourceBall, source = "line", depth = 0) {
     for (const block of [...this.blocks]) {
       if (Math.abs(block.cy - y) <= height / 2 + block.height / 2) {
-        this.damageBlock(block, damage, sourceBall, source, depth);
+        const amount = typeof damage === "function" ? damage(block) : damage;
+        this.damageBlock(block, amount, sourceBall, source, depth);
       }
     }
   },
@@ -973,7 +1011,8 @@ const Game = {
   applyColumnDamage(x, width, damage, sourceBall, source = "column", depth = 0) {
     for (const block of [...this.blocks]) {
       if (Math.abs(block.cx - x) <= width / 2 + block.width / 2) {
-        this.damageBlock(block, damage, sourceBall, source, depth);
+        const amount = typeof damage === "function" ? damage(block) : damage;
+        this.damageBlock(block, amount, sourceBall, source, depth);
       }
     }
   },
@@ -1018,7 +1057,8 @@ const Game = {
         if (projectile.hitIds.has(block.id)) continue;
         if (!circleRectHit(projectile.x, projectile.y, projectile.radius, block.collisionRect)) continue;
         projectile.hitIds.add(block.id);
-        this.damageBlock(block, projectile.damage, projectile.sourceBall, "projectile", 1);
+        const damage = typeof projectile.damage === "function" ? projectile.damage(block) : projectile.damage;
+        this.damageBlock(block, damage, projectile.sourceBall, "projectile", 1);
         Effects.spawnBlockBreak(projectile.x, projectile.y, projectile.color);
         AudioSystem.playBlockHit(this.combo);
         if (projectile.pierce > 0) {
@@ -1068,7 +1108,7 @@ const Game = {
         for (const ball of this.balls) {
           if (ball.alive && distance(ball.x, ball.y, zone.x, zone.y) < zone.radius + ball.radius) {
             ball.damageBoostTimer = 1.2;
-            ball.damageBoostMultiplier = 1.15 + getSkillLevel(zone.sourceBall, "afterburn") * 0.08;
+            ball.damageBoostMultiplier = skillParam("afterburn", getSkillLevel(zone.sourceBall, "afterburn"), "projectileBuff", 1);
           }
         }
       }
@@ -1218,8 +1258,9 @@ const Game = {
     if (this.balls.length >= BALL_MAX) return false;
     const index = this.balls.length;
     const ball = new Ball(this.paddle.x + this.paddle.getWidth() / 2, this.paddle.y - 12, BALL_COLORS[index]);
-    ball.launch(ball.x, ball.y);
     this.balls.push(ball);
+    ball.readyOnPaddle(this);
+    this.positionWaitingLaunchBalls();
     this.syncBumperFromBalls(true);
     Effects.showBallRevive(ball.x, ball.y, ball.color);
     UI.renderSlots(this.balls, this.paddle);
@@ -1301,20 +1342,43 @@ const Game = {
   },
 
   updateHud() {
-    const progressText = document.getElementById("hud-progress-text");
-    const progressFill = document.getElementById("hud-progress-fill");
     const scoreNode = document.getElementById("hud-score");
-    const pauseButton = document.getElementById("btn-pause");
-    if (!progressText || !progressFill || !scoreNode) return;
-    const progress = clamp(this.blocksTowardSkill / this.blocksPerSkill, 0, 1);
-    progressText.textContent = `${Math.min(this.blocksTowardSkill, this.blocksPerSkill)}/${this.blocksPerSkill}`;
-    progressFill.style.width = `${progress * 100}%`;
+    if (!scoreNode) return;
     scoreNode.textContent = formatNumber(this.score);
     const hpToken = document.getElementById("hp-token-count");
     if (hpToken) hpToken.textContent = formatNumber(this.tokens);
+    const pauseButton = document.getElementById("btn-pause");
     if (pauseButton) {
       pauseButton.textContent = this.paused ? "PLAY" : "STOP";
       pauseButton.classList.toggle("active", this.paused);
+    }
+    const timerNode = document.getElementById("hud-timer");
+    if (timerNode) {
+      const totalSecs = Math.floor(this.playTime || 0);
+      const minutes = Math.floor(totalSecs / 60);
+      const secs = totalSecs % 60;
+      timerNode.textContent = `${minutes}:${String(secs).padStart(2, "0")}`;
+    }
+    this.updateComboHud();
+  },
+
+  updateComboHud() {
+    const banner = document.getElementById("combo-banner");
+    const countNode = document.getElementById("combo-count");
+    if (!banner || !countNode) return;
+    const combo = Math.max(0, this.combo || 0);
+    const visible = currentState === STATE.PLAYING && combo >= 2;
+    banner.classList.toggle("active", visible);
+    if (!visible) {
+      this.comboHudValue = 0;
+      return;
+    }
+    if (combo !== this.comboHudValue) {
+      this.comboHudValue = combo;
+      countNode.textContent = String(combo);
+      banner.classList.remove("combo-pop");
+      void banner.offsetWidth;
+      banner.classList.add("combo-pop");
     }
   }
 };

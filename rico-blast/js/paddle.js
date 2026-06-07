@@ -15,7 +15,8 @@ class Paddle {
   }
 
   getWidth() {
-    return this.baseWidth + getSkillLevel(this, "paddleWidth") * 14;
+    const level = getSkillLevel(this, "paddleWidth");
+    return level > 0 ? skillParam("paddleWidth", level, "width", this.baseWidth) : this.baseWidth;
   }
 
   setPosition(canvasWidth, canvasHeight) {

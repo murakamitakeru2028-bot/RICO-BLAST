@@ -1,11 +1,51 @@
-const BALL_MAX = 3;
-const BALL_COLORS = ["#ff6b6b", "#4a9eff", "#ffcc4a"];
+const BALL_MAX = 4;
+const BALL_COLORS = ["#ff6b6b", "#4a9eff", "#ffcc4a", "#7cf5b2"];
 
 const UPGRADE_DEFS = {
   speed: { label: "速度", baseCost: 10, max: 5 },
   damage: { label: "ダメージ", baseCost: 10, max: 5 },
   reviveSpeed: { label: "復活速度", baseCost: 10, max: 5 },
   critRate: { label: "クリティカル率", baseCost: 10, max: 5 }
+};
+
+const SKILL_LEVELS = {
+  splash: { radius: [30, 40, 52, 65, 80], damage: [0.08, 0.11, 0.16, 0.22, 0.27] },
+  spread: { count: [3, 4, 5, 6, 8], damage: [0.08, 0.10, 0.12, 0.14, 0.17] },
+  chain: { count: [1, 2, 3, 4, 5], damage: [0.10, 0.13, 0.16, 0.19, 0.22] },
+  sniper: { limit: [3, 5, Infinity, Infinity, Infinity], damage: [0.12, 0.16, 0.20, 0.26, 0.32], cross: [false, false, false, false, true] },
+  doubleChance: { chance: [0.20, 0.30, 0.35, 0.42, 0.50], damageMultiplier: [0.40, 0.50, 0.55, 0.65, 0.75] },
+  crossfire: { countPerSide: [1, 1, 1, 2, 2], damage: [0.08, 0.10, 0.13, 0.15, 0.17], pierce: [2, 3, 4, 5, 7] },
+  overload: { step: [0.2, 0.3, 0.4, 0.5, 0.6], cap: [2, 2.5, 3, 4, 5] },
+  fragment: { count: [3, 4, 5, 6, 8], damage: [0.06, 0.07, 0.09, 0.10, 0.11] },
+  detonator: { hits: [3, 3, 3, 3, 3], radius: [40, 52, 62, 72, 81], damage: [0.18, 0.22, 0.27, 0.32, 0.36] },
+  poison: { duration: [4, 5, 7, 8, 10], interval: [0.5, 0.5, 0.5, 0.5, 0.5], damage: [0.015, 0.02, 0.025, 0.03, 0.04] },
+  afterburn: { radius: [25, 30, 35, 38, 42], duration: [3, 4, 5, 6, 8], damage: [0.015, 0.02, 0.025, 0.03, 0.04], projectileBuff: [1.2, 1.3, 1.4, 1.48, 1.55] },
+  lightning: { count: [2, 2, 3, 4, 5], radius: [100, 130, 160, 185, 210], damage: [0.10, 0.13, 0.16, 0.19, 0.22] },
+  blast: { height: [6, 8, 12, 15, 18], damage: [0.10, 0.13, 0.17, 0.21, 0.24] },
+  impact: { multiplier: [1.4, 1.6, 1.75, 1.9, 2.0] },
+  crash: { normalMultiplier: [1.05, 1.08, 1.12, 1.18, 1.275], cap: [1.2, 1.35, 1.5, 1.65, 1.8] },
+  sprint: { duration: [0.8, 1, 1.3, 1.6, 2], speedMultiplier: [1.4, 1.55, 1.7, 1.85, 2.0] },
+  teleporter: { chance: [0.25, 0.28, 0.30, 0.32, 0.35] },
+  immortality: { saves: [1, 1, 2, 2, 3], boostMultiplier: [1.2, 1.35, 1.45, 1.55, 1.6], boostDuration: [0.5, 0.8, 1, 1, 1] },
+  mirror: { interval: [1.5, 1.2, 1.0, 0.7, 0.5], damage: [0.08, 0.10, 0.13, 0.16, 0.18] },
+  rebound: { multiplier: [1.3, 1.5, 1.65, 1.8, 2.0] },
+  phantom: { count: [2, 3, 3, 4, 5], damage: [0.10, 0.13, 0.17, 0.21, 0.25], reviveLevel: [3, 3, 3, 3, 3] },
+  aura: { radius: [50, 60, 72, 82, 90], interval: [0.1, 0.1, 0.1, 0.1, 0.1], damage: [0.015, 0.022, 0.03, 0.04, 0.05] },
+  berserker: { duration: [4, 6, 8, 9, 10], speedMultiplier: [1.1, 1.12, 1.15, 1.18, 1.2], damageMultiplier: [1.3, 1.45, 1.6, 1.7, 1.8] },
+  cycle: { interval: [3, 2.8, 2.5, 2.2, 2], splashDamage: [0.08, 0.11, 0.14, 0.17, 0.20], lightningDamage: [0.10, 0.13, 0.16, 0.19, 0.22], damageMultiplier: [1.2, 1.25, 1.3, 1.4, 1.5] },
+  expert: { perAverageLevel: [0.03, 0.05, 0.07, 0.096, 0.12] },
+  echo: { radius: [15, 20, 26, 30, 35], duration: [3, 4, 6, 7, 8], damage: [0.02, 0.028, 0.035, 0.042, 0.05] },
+  lastHit: { fixedBonus: [8, 12, 16, 20, 25], hpDivisor: [25, 20, 16, 13, 10] },
+  scoreBoost: { multiplier: [1.2, 1.35, 1.5, 1.63, 1.75] },
+  vampire: { percent: [0.02, 0.03, 0.035, 0.04, 0.05] },
+  paddleWidth: { width: [96, 108, 120, 135, 150] },
+  bounceHeal: { percent: [0.01, 0.02, 0.03, 0.04, 0.05] },
+  reviveBoost: { seconds: [1, 2, 2.5, 3, 4] },
+  superBounce: { chance: [0.20, 0.27, 0.33, 0.38, 0.43], duration: [0.5, 0.8, 1, 1.4, 1.8], damageMultiplier: [1.4, 1.55, 1.7, 1.9, 2.15] },
+  globalDamage: { multiplier: [1.15, 1.25, 1.38, 1.5, 1.6] },
+  globalSpeed: { multiplier: [1.1, 1.2, 1.28, 1.34, 1.4] },
+  bumperFortify: { hp: [4, 5, 6, 8, 10] },
+  bumperRecover: { seconds: [2.4, 2.0, 1.6, 1.2, 1.0] }
 };
 
 Object.assign(UPGRADE_DEFS, {
@@ -16,20 +56,6 @@ Object.assign(UPGRADE_DEFS, {
 });
 
 const SKILLS = {
-  homing: {
-    id: "homing",
-    name: "ホーミング",
-    type: "ball",
-    category: "movement",
-    color: "#4a9eff",
-    maxLevel: 5,
-    description: "最も近いブロックへ軌道を微補正する",
-    applyEffect(ball, game, level) {
-      const target = game.findNearestBlock(ball.x, ball.y);
-      if (!target) return;
-      steerBallToward(ball, target.cx, target.cy, 0.012 * level);
-    }
-  },
   penetration: {
     id: "penetration",
     name: "貫通",
@@ -102,15 +128,6 @@ const SKILLS = {
     maxLevel: 5,
     description: "破壊時に同じ列へ追加ダメージ"
   },
-  magnetism: {
-    id: "magnetism",
-    name: "磁力",
-    type: "ball",
-    category: "attack",
-    color: "#44ddcc",
-    maxLevel: 5,
-    description: "小弾が周囲ブロックに吸い寄せられる"
-  },
   doubleChance: {
     id: "doubleChance",
     name: "ダブルチャンス",
@@ -155,15 +172,6 @@ const SKILLS = {
     color: "#ffcc4a",
     maxLevel: 5,
     description: "3ヒットごとに範囲爆発を起こす"
-  },
-  shatter: {
-    id: "shatter",
-    name: "シャッター",
-    type: "ball",
-    category: "attack",
-    color: "#ff4a4a",
-    maxLevel: 5,
-    description: "弱った近接ブロックを自動射撃する"
   },
   poison: {
     id: "poison",
@@ -245,15 +253,6 @@ const SKILLS = {
     color: "#44ddcc",
     maxLevel: 5,
     description: "軌道上に残像ダメージを残す"
-  },
-  focus: {
-    id: "focus",
-    name: "フォーカス",
-    type: "ball",
-    category: "special",
-    color: "#4a9eff",
-    maxLevel: 5,
-    description: "最高HPのブロックを狙う"
   },
   phantom: {
     id: "phantom",
@@ -470,6 +469,19 @@ function getSkillLevel(entity, skillId) {
   return equipped ? equipped.level : 0;
 }
 
+function skillParam(skillId, level, key, fallback = 0) {
+  const table = SKILL_LEVELS[skillId];
+  const values = table ? table[key] : null;
+  if (!values) return fallback;
+  const index = clamp(Math.floor(level || 1), 1, 5) - 1;
+  return values[index] ?? fallback;
+}
+
+function skillDamageByMaxHp(block, skillId, level, key = "damage") {
+  const ratio = skillParam(skillId, level, key, 0);
+  return Math.max(1, Math.round((block ? block.maxHp : 1) * ratio));
+}
+
 function getTotalStars(entity) {
   if (!entity || !entity.skills) return 0;
   return entity.skills.reduce((sum, skill) => sum + skill.level, 0);
@@ -550,7 +562,8 @@ function getSkillRerollCost() {
 function getBallPurchaseCost(ballNumber) {
   const costs = {
     2: 1000,
-    3: 10000
+    3: 10000,
+    4: 100000
   };
   return ballNumber <= BALL_MAX ? (costs[ballNumber] || Infinity) : Infinity;
 }

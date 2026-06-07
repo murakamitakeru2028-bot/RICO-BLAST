@@ -29,7 +29,8 @@ class Bumper {
 
   syncStats() {
     const ownedHp = Math.max(0, this.level || 0);
-    const nextMaxHp = ownedHp + getSkillLevel(this, "bumperFortify");
+    const fortify = getSkillLevel(this, "bumperFortify");
+    const nextMaxHp = fortify > 0 ? Math.max(ownedHp, skillParam("bumperFortify", fortify, "hp", ownedHp)) : ownedHp;
     const previousMaxHp = this.maxHp;
     const previousHp = this.hp;
     this.maxHp = nextMaxHp;
@@ -75,9 +76,10 @@ class Bumper {
 
   getReviveTime() {
     if (this.level <= 0) return 0;
+    const recover = getSkillLevel(this, "bumperRecover");
+    if (recover > 0) return skillParam("bumperRecover", recover, "seconds", 1);
     const levelTime = 10 * Math.pow(0.9, Math.max(0, this.level - 1));
-    const skillMultiplier = Math.pow(0.92, getSkillLevel(this, "bumperRecover"));
-    return Math.max(1, levelTime * skillMultiplier);
+    return Math.max(1, levelTime);
   }
 
   update(game, dt) {

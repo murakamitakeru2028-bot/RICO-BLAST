@@ -62,9 +62,9 @@ class Block {
         continue;
       }
       if (poison.timer <= 0) {
-        poison.timer = 0.5;
+        poison.timer = skillParam("poison", poison.level, "interval", 0.5);
         const damage = poison.sourceBall && poison.sourceBall.getSkillDamage
-          ? poison.sourceBall.getSkillDamage(game, poison.level, "dot")
+          ? skillDamageByMaxHp(this, "poison", poison.level)
           : poison.level * 2;
         const destroyed = game.damageBlock(this, damage, poison.sourceBall, "poison");
         if (destroyed) break;
@@ -76,14 +76,14 @@ class Block {
     const existing = this.poisons.find((poison) => poison.sourceBall === sourceBall);
     if (existing) {
       existing.level = Math.max(existing.level, level);
-      existing.remaining = 5 + level;
+      existing.remaining = skillParam("poison", existing.level, "duration", 4);
       return;
     }
     this.poisons.push({
       level,
       sourceBall,
-      remaining: 5 + level,
-      timer: 0.5
+      remaining: skillParam("poison", level, "duration", 4),
+      timer: skillParam("poison", level, "interval", 0.5)
     });
   }
 

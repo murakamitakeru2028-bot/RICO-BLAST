@@ -32,12 +32,12 @@ class Ball {
     this.firstHitAfterPaddle = true;
     this.damageBoostTimer = 0;
     this.damageBoostMultiplier = 1;
-    this.shatterTimer = 0;
     this.auraTimer = 0;
     this.echoTimer = 0;
     this.mirrorTimer = 0;
     this.cycleTimer = 0;
     this.cycleEffect = null;
+    this.cycleIndex = 0;
     this.spreadUsed = false;
     this.path = [];
   }
@@ -51,10 +51,13 @@ class Ball {
     this.vx = rand(-3, 3);
     if (Math.abs(this.vx) < 1) this.vx = this.vx < 0 ? -1.2 : 1.2;
     this.vy = -5;
-    this.penetrationLeft = getSkillLevel(this, "penetration") + (getSkillLevel(this, "focus") >= 5 ? 1 : 0);
-    this.fallSaves = Math.min(3, Math.ceil(getSkillLevel(this, "immortality") / 2));
+    this.penetrationLeft = getSkillLevel(this, "penetration");
+    this.fallSaves = skillParam("immortality", getSkillLevel(this, "immortality"), "saves", 0);
     this.firstHitAfterPaddle = true;
     this.paddlelessHits = 0;
+    this.cycleTimer = 0;
+    this.cycleEffect = null;
+    this.cycleIndex = 0;
     this.spreadUsed = false;
     this.path = [];
     this.normalizeSpeed(this.getTargetSpeed());
@@ -62,6 +65,9 @@ class Ball {
 
   respawn(game) {
     this.readyOnPaddle(game);
+    if (getSkillLevel(this, "phantom") >= skillParam("phantom", getSkillLevel(this, "phantom"), "reviveLevel", 3)) {
+      this.spawnPhantomProjectiles(game, true);
+    }
     Effects.showBallRevive(this.x, this.y, this.getPrimaryColor());
   }
 
@@ -93,7 +99,7 @@ class Ball {
     this.launch(this.x, this.y);
     const berserker = getSkillLevel(this, "berserker");
     if (berserker > 0) {
-      this.berserkTimer = 10 + berserker * 2;
+      this.berserkTimer = skillParam("berserker", berserker, "duration", 4);
       Effects.showPopup("BERSERK", this.x, this.y - 16, SKILLS.berserker.color);
     }
     Effects.showBallRevive(this.x, this.y, this.getPrimaryColor());
@@ -152,34 +158,20 @@ class Ball {
       if (definition && definition.applyEffect) definition.applyEffect(this, game, equipped.level);
     }
 
-    const focus = getSkillLevel(this, "focus");
-    if (focus > 0) {
-      const target = game.findHighestHpBlock();
-      if (target) steerBallToward(this, target.cx, target.cy, 0.006 * focus);
-    }
-
     const aura = getSkillLevel(this, "aura");
     if (aura > 0) {
       this.auraTimer -= dt;
       if (this.auraTimer <= 0) {
-        this.auraTimer = 0.1;
-        game.applyAreaDamage(this.x, this.y, 40 + aura * 10, this.getSkillDamage(game, aura, "aura"), this, null, "aura");
-      }
-    }
-
-    const shatter = getSkillLevel(this, "shatter");
-    if (shatter > 0) {
-      this.shatterTimer -= dt;
-      if (this.shatterTimer <= 0) {
-        this.shatterTimer = 0.5;
-        const threshold = 0.12 + shatter * 0.04;
-        const target = game.blocks.find((block) =>
-          block.hp / block.maxHp <= threshold &&
-          distance(this.x, this.y, block.cx, block.cy) < 86 + shatter * 18
+        this.auraTimer = skillParam("aura", aura, "interval", 0.1);
+        game.applyAreaDamage(
+          this.x,
+          this.y,
+          skillParam("aura", aura, "radius", 50),
+          (block) => skillDamageByMaxHp(block, "aura", aura),
+          this,
+          null,
+          "aura"
         );
-        if (target) {
-          game.spawnProjectile(this.x, this.y, target.cx, target.cy, 7, this.getSkillDamage(game, shatter, "shard"), this, "#ff4a4a", 4);
-        }
       }
     }
 
@@ -192,10 +184,10 @@ class Ball {
           kind: "echo",
           x: this.x,
           y: this.y,
-          radius: 8 + echo * 2,
-          life: echo,
-          maxLife: echo,
-          damage: this.getSkillDamage(game, echo, "aura"),
+          radius: skillParam("echo", echo, "radius", 15),
+          life: skillParam("echo", echo, "duration", 3),
+          maxLife: skillParam("echo", echo, "duration", 3),
+          damage: (block) => skillDamageByMaxHp(block, "echo", echo),
           tick: 0.2,
           tickTimer: 0,
           color: SKILLS.echo.color,
@@ -208,8 +200,8 @@ class Ball {
     if (mirror > 0) {
       this.mirrorTimer -= dt;
       if (this.mirrorTimer <= 0) {
-        this.mirrorTimer = Math.max(0.35, 1.1 - mirror * 0.12);
-        game.spawnProjectile(this.x, this.y, -this.vx, this.vy, 4.2, this.getSkillDamage(game, mirror, "shard"), this, SKILLS.mirror.color, 0, true);
+        this.mirrorTimer = skillParam("mirror", mirror, "interval", 1.5);
+        game.spawnProjectile(this.x, this.y, -this.vx, this.vy, 4.2, (block) => skillDamageByMaxHp(block, "mirror", mirror), this, SKILLS.mirror.color, 0, true);
       }
     }
 
@@ -218,8 +210,9 @@ class Ball {
       this.cycleTimer -= dt;
       if (this.cycleTimer <= 0) {
         const effects = ["splash", "lightning", "damage"];
-        this.cycleEffect = effects[randomInt(0, effects.length - 1)];
-        this.cycleTimer = Math.max(1, 5 - cycle);
+        this.cycleEffect = effects[this.cycleIndex % effects.length];
+        this.cycleIndex += 1;
+        this.cycleTimer = skillParam("cycle", cycle, "interval", 3);
         Effects.showPopup("CYCLE", this.x, this.y - 16, SKILLS.cycle.color);
       }
     }
@@ -272,29 +265,29 @@ class Ball {
     this.firstHitAfterPaddle = true;
     this.paddlelessHits = 0;
     game.combo = 0;
-    this.penetrationLeft = getSkillLevel(this, "penetration") + (getSkillLevel(this, "focus") >= 5 ? 1 : 0);
-    this.fallSaves = Math.min(3, Math.ceil(getSkillLevel(this, "immortality") / 2));
+    this.penetrationLeft = getSkillLevel(this, "penetration");
+    this.fallSaves = skillParam("immortality", getSkillLevel(this, "immortality"), "saves", 0);
     this.spreadUsed = false;
 
     const sprint = getSkillLevel(this, "sprint");
-    if (sprint > 0) this.sprintTimer = 2;
+    if (sprint > 0) this.sprintTimer = skillParam("sprint", sprint, "duration", 1);
 
     const rebound = getSkillLevel(this, "rebound");
-    if (rebound > 0) this.reboundBonus += rebound * 0.2;
+    if (rebound > 0) this.reboundBonus += skillParam("rebound", rebound, "multiplier", 1) - 1;
 
     const bounceHeal = getSkillLevel(paddle, "bounceHeal");
-    if (bounceHeal > 0) game.healPaddle(bounceHeal, this.x, paddle.y);
+    if (bounceHeal > 0) game.healPaddle(Math.max(1, paddle.maxHp * skillParam("bounceHeal", bounceHeal, "percent", 0)), this.x, paddle.y);
 
     const superBounce = getSkillLevel(paddle, "superBounce");
-    if (superBounce > 0 && Math.random() < 0.08 + superBounce * 0.07) {
-      this.damageBoostTimer = 1.8;
-      this.damageBoostMultiplier = 1.4 + superBounce * 0.15;
+    if (superBounce > 0 && Math.random() < skillParam("superBounce", superBounce, "chance", 0)) {
+      this.damageBoostTimer = skillParam("superBounce", superBounce, "duration", 1);
+      this.damageBoostMultiplier = skillParam("superBounce", superBounce, "damageMultiplier", 1);
       this.vy *= 1.08;
       Effects.showPopup("SUPER", this.x, this.y - 18, SKILLS.superBounce.color);
     }
 
     const teleporter = getSkillLevel(this, "teleporter");
-    if (teleporter > 0 && Math.random() < 0.1 + teleporter * 0.1) {
+    if (teleporter > 0 && Math.random() < skillParam("teleporter", teleporter, "chance", 0)) {
       const anchor = game.findDenseBlockAnchor();
       if (anchor) {
         this.x = clamp(anchor.x, this.radius, game.width - this.radius);
@@ -348,16 +341,24 @@ class Ball {
     const detonator = getSkillLevel(this, "detonator");
     if (detonator > 0) {
       this.detCounter = (this.detCounter || 0) + 1;
-      if (this.detCounter >= 3) {
+      if (this.detCounter >= skillParam("detonator", detonator, "hits", 3)) {
         this.detCounter = 0;
-        game.applyAreaDamage(block.cx, block.cy, 46 + detonator * 7, this.getSkillDamage(game, detonator, "burst"), this, block, "detonator");
+        game.applyAreaDamage(
+          block.cx,
+          block.cy,
+          skillParam("detonator", detonator, "radius", 40),
+          (target) => skillDamageByMaxHp(target, "detonator", detonator),
+          this,
+          block,
+          "detonator"
+        );
         Effects.shakeScreen(2.5, 0.12);
       }
     }
 
     const doubleChance = getSkillLevel(this, "doubleChance");
-    if (!destroyed && doubleChance > 0 && Math.random() < doubleChance * 0.1) {
-      game.damageBlock(block, damage * 0.75, this, "double");
+    if (!destroyed && doubleChance > 0 && Math.random() < skillParam("doubleChance", doubleChance, "chance", 0)) {
+      game.damageBlock(block, skillDamageByMaxHp(block, "doubleChance", doubleChance, "damageMultiplier"), this, "double");
       Effects.showPopup("DOUBLE", block.cx, block.cy, SKILLS.doubleChance.color);
     }
 
@@ -374,12 +375,12 @@ class Ball {
 
     if (this.berserkTimer > 0) {
       const level = getSkillLevel(this, "berserker");
-      damage *= 1.5 + level * 0.2;
+      damage *= skillParam("berserker", level, "damageMultiplier", 1);
     }
 
     const impact = getSkillLevel(this, "impact");
     if (impact > 0 && this.firstHitAfterPaddle) {
-      damage *= 2 + impact * 0.3;
+      damage *= skillParam("impact", impact, "multiplier", 1);
       this.firstHitAfterPaddle = false;
       Effects.showPopup("IMPACT", block.cx, block.cy - 12, SKILLS.impact.color);
     }
@@ -387,25 +388,26 @@ class Ball {
     const crash = getSkillLevel(this, "crash");
     if (crash > 0) {
       const speedRatio = clamp(this.getCurrentSpeed() / Math.max(1, this.getBaseSpeed()), 0.8, 1.9);
-      damage *= 1 + crash * 0.055 * speedRatio;
+      const normalMultiplier = skillParam("crash", crash, "normalMultiplier", 1);
+      damage *= Math.min(skillParam("crash", crash, "cap", 1.8), 1 + (normalMultiplier - 1) * speedRatio);
     }
 
     const overload = getSkillLevel(this, "overload");
     if (overload > 0) {
       const count = (this.blockHitCounts.get(block.id) || 0) + 1;
       this.blockHitCounts.set(block.id, count);
-      damage *= 1 + count * 0.2 * overload;
+      damage *= Math.min(skillParam("overload", overload, "cap", 5), 1 + count * skillParam("overload", overload, "step", 0.2));
     }
 
     const expert = getSkillLevel(this, "expert");
-    if (expert > 0) damage *= 1 + getAverageSkillLevel(this) * 0.03 * expert;
+    if (expert > 0) damage *= 1 + getAverageSkillLevel(this) * skillParam("expert", expert, "perAverageLevel", 0);
 
     if (this.reboundBonus > 0) {
       damage *= 1 + this.reboundBonus;
       this.reboundBonus = 0;
     }
 
-    if (this.cycleEffect === "damage") damage *= 1.25;
+    if (this.cycleEffect === "damage") damage *= skillParam("cycle", getSkillLevel(this, "cycle"), "damageMultiplier", 1.5);
 
     const critChance = this.upgrades.critRate * 0.05;
     if (Math.random() < critChance) {
@@ -419,15 +421,19 @@ class Ball {
   getBaseDamage(game = null) {
     let damage = 100 + this.baseDamageBonus + this.upgrades.damage * 50;
     const paddle = game && game.paddle ? game.paddle : (typeof Game !== "undefined" ? Game.paddle : null);
-    damage *= 1 + getSkillLevel(paddle, "globalDamage") * 0.12;
+    const globalDamage = getSkillLevel(paddle, "globalDamage");
+    if (globalDamage > 0) damage *= skillParam("globalDamage", globalDamage, "multiplier", 1);
     return damage;
   }
 
   getSkillDamage(game, level, profile = "projectile") {
     const curves = {
-      aura: { base: 0.007, perLevel: 0.003 },
-      dot: { base: 0.016, perLevel: 0.006 },
-      shard: { base: 0.045, perLevel: 0.017 },
+      aura: { base: 0.015, perLevel: 0.008 },
+      dot: { base: 0.015, perLevel: 0.006 },
+      echo: { base: 0.02, perLevel: 0.008 },
+      shard: { base: 0.06, perLevel: 0.012 },
+      phantom: { base: 0.10, perLevel: 0.04 },
+      mirror: { base: 0.08, perLevel: 0.025 },
       projectile: { base: 0.07, perLevel: 0.025 },
       chain: { base: 0.09, perLevel: 0.032 },
       line: { base: 0.1, perLevel: 0.035 },
@@ -482,8 +488,8 @@ class Ball {
       this.fallSaves -= 1;
       this.y = game.height - this.radius - 3;
       this.vy = -Math.abs(this.vy || 5);
-      if (immortality >= 3) this.damageBoostTimer = 1;
-      if (immortality >= 3) this.damageBoostMultiplier = 1 + immortality * 0.12;
+      this.damageBoostTimer = skillParam("immortality", immortality, "boostDuration", 0.5);
+      this.damageBoostMultiplier = skillParam("immortality", immortality, "boostMultiplier", 1);
       Effects.showPopup("REVOLT", this.x, this.y - 16, SKILLS.immortality.color);
       return;
     }
@@ -491,23 +497,15 @@ class Ball {
     const spread = getSkillLevel(this, "spread");
     if (spread > 0 && !this.spreadUsed) {
       this.spreadUsed = true;
-      const count = 3 + spread;
-      const damage = this.getSkillDamage(game, spread, "projectile");
+      const count = skillParam("spread", spread, "count", 3);
+      const damage = (block) => skillDamageByMaxHp(block, "spread", spread);
       for (let i = 0; i < count; i += 1) {
         const angle = Math.PI * (1.08 + (i / Math.max(1, count - 1)) * 0.84);
         game.spawnProjectile(this.x, game.height - 18, Math.cos(angle), Math.sin(angle), 6, damage, this, SKILLS.spread.color, 0, true);
       }
     }
 
-    const phantom = getSkillLevel(this, "phantom");
-    if (phantom > 0 && this.path.length > 4) {
-      const repeats = 1 + Math.floor(phantom / 2);
-      const damage = this.getSkillDamage(game, phantom, "projectile");
-      for (let i = 0; i < repeats; i += 1) {
-        const point = this.path[Math.max(0, this.path.length - 10 - i * 6)];
-        game.spawnProjectile(point.x, point.y, -this.vx, -Math.abs(this.vy), 5, damage, this, SKILLS.phantom.color, 0, true);
-      }
-    }
+    this.spawnPhantomProjectiles(game, false);
 
     this.alive = false;
     this.reviveTimer = this.getReviveTime(game);
@@ -517,9 +515,27 @@ class Ball {
     this.blockHitCounts.clear();
   }
 
+  spawnPhantomProjectiles(game, fromRevive = false) {
+    const phantom = getSkillLevel(this, "phantom");
+    if (phantom <= 0) return;
+
+    const count = skillParam("phantom", phantom, "count", 2);
+    const damage = (block) => skillDamageByMaxHp(block, "phantom", phantom);
+    for (let i = 0; i < count; i += 1) {
+      if (!fromRevive && this.path.length > 4) {
+        const point = this.path[Math.max(0, this.path.length - 8 - i * 5)];
+        game.spawnProjectile(point.x, point.y, -this.vx, -Math.abs(this.vy), 5.4, damage, this, SKILLS.phantom.color, 0, true);
+        continue;
+      }
+
+      const spread = count <= 1 ? 0 : (i / (count - 1) - 0.5) * 0.95;
+      game.spawnProjectile(this.x, this.y, spread, -1, 5.4, damage, this, SKILLS.phantom.color, 0, true);
+    }
+  }
+
   getReviveTime(game) {
     const localReduction = this.upgrades.reviveSpeed * 1.1;
-    const globalReduction = getSkillLevel(game.paddle, "reviveBoost") * 0.8;
+    const globalReduction = skillParam("reviveBoost", getSkillLevel(game.paddle, "reviveBoost"), "seconds", 0);
     const speedPenalty = this.upgrades.speed * 0.4;
     const damagePenalty = this.upgrades.damage * 0.5;
     return Math.max(2.5, this.baseReviveTime - localReduction - globalReduction + speedPenalty + damagePenalty);
@@ -531,9 +547,10 @@ class Ball {
 
   getTargetSpeed() {
     let speed = this.getBaseSpeed();
-    speed *= 1 + getSkillLevel(Game.paddle, "globalSpeed") * 0.08;
-    if (this.sprintTimer > 0) speed *= 1.5 + getSkillLevel(this, "sprint") * 0.1;
-    if (this.berserkTimer > 0) speed *= 1.08 + getSkillLevel(this, "berserker") * 0.05;
+    const globalSpeed = getSkillLevel(Game.paddle, "globalSpeed");
+    if (globalSpeed > 0) speed *= skillParam("globalSpeed", globalSpeed, "multiplier", 1);
+    if (this.sprintTimer > 0) speed *= skillParam("sprint", getSkillLevel(this, "sprint"), "speedMultiplier", 1);
+    if (this.berserkTimer > 0) speed *= skillParam("berserker", getSkillLevel(this, "berserker"), "speedMultiplier", 1);
     return speed;
   }
 
