@@ -129,8 +129,8 @@ class Ball {
     this.applyPassiveSkills(game, dt);
     const moveX = this.vx * frame;
     const moveY = this.vy * frame;
-    const stepSize = Math.max(4, this.radius * 0.5);
-    const steps = clamp(Math.ceil(Math.max(Math.abs(moveX), Math.abs(moveY)) / stepSize), 1, 10);
+    const stepSize = Math.max(3, this.radius * 0.35);
+    const steps = clamp(Math.ceil(Math.max(Math.abs(moveX), Math.abs(moveY)) / stepSize), 1, 18);
     const stepFrame = frame / steps;
 
     for (let i = 0; i < steps; i += 1) {
@@ -531,11 +531,20 @@ class Ball {
       else normalY = dy < 0 ? -1 : 1;
     }
 
-    const rect = block.collisionRect;
-    if (normalX < 0) this.x = rect.x - this.radius - 0.5;
-    else if (normalX > 0) this.x = rect.x + rect.width + this.radius + 0.5;
-    if (normalY < 0) this.y = rect.y - this.radius - 0.5;
-    else if (normalY > 0) this.y = rect.y + rect.height + this.radius + 0.5;
+    const hasContact = collision &&
+      Number.isFinite(collision.contactX) &&
+      Number.isFinite(collision.contactY);
+    if (hasContact) {
+      const skin = 0.6;
+      this.x = collision.contactX + normalX * skin;
+      this.y = collision.contactY + normalY * skin;
+    } else {
+      const rect = block.collisionRect;
+      if (normalX < 0) this.x = rect.x - this.radius - 0.5;
+      else if (normalX > 0) this.x = rect.x + rect.width + this.radius + 0.5;
+      if (normalY < 0) this.y = rect.y - this.radius - 0.5;
+      else if (normalY > 0) this.y = rect.y + rect.height + this.radius + 0.5;
+    }
 
     const dot = this.vx * normalX + this.vy * normalY;
     if (dot < 0) {

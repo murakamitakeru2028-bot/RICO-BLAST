@@ -101,6 +101,8 @@ const UI = {
     const title = document.getElementById("screen-title");
     const highScore = Number(localStorage.getItem("ricoBlast_highScore") || 0);
     const bestBlocks = Number(localStorage.getItem("ricoBlast_bestBlocks") || 0);
+    const account = typeof AccountManager !== "undefined" ? AccountManager.getCurrentAccount() : null;
+    const accountLabel = account ? this.escapeHtml(account.username || "ACCOUNT") : "ACCOUNT";
     title.innerHTML = `
       <div class="title-shell">
         <div class="title-topline">
@@ -149,6 +151,7 @@ const UI = {
         <button class="btn-start" id="btn-start">GAME START</button>
         <div class="title-secondary-buttons">
           <button class="btn-sub" id="btn-ranking">RANKING</button>
+          <button class="btn-sub" id="btn-account">${accountLabel}</button>
           <button class="btn-sub" id="btn-settings">SETTINGS</button>
           <button class="btn-sub btn-install" id="btn-install" hidden>INSTALL</button>
         </div>
@@ -164,6 +167,7 @@ const UI = {
       Game.startRun();
     });
     document.getElementById("btn-ranking").addEventListener("click", () => this.showRanking());
+    document.getElementById("btn-account").addEventListener("click", () => this.showAccount());
     document.getElementById("btn-settings").addEventListener("click", () => this.showSettings());
     if (typeof PWAInstall !== "undefined") PWAInstall.bindInstallButton(document.getElementById("btn-install"));
   },
@@ -194,14 +198,14 @@ const UI = {
       if (!ball) {
         const buyState = this.getBallPurchaseSlotState(i, balls);
         const isStoreSlot = this.canBuyBallInCurrentPhase();
-        slot.className = `slot empty ${isStoreSlot ? "store-empty" : ""} ${buyState.buyable ? "buyable" : ""} ${buyState.locked ? "locked" : ""}`;
+        slot.className = `slot empty ${isStoreSlot ? "store-empty" : ""} ${buyState.buyable ? "buyable" : ""} ${buyState.locked ? "locked" : ""} ${buyState.insufficient ? "insufficient" : ""}`;
         slot.style.borderColor = "";
         slot.style.removeProperty("--selected-color");
         slot.style.removeProperty("--primary-skill-color");
         slot.style.removeProperty("--revive-fill");
         if (isStoreSlot) {
           const cost = Number.isFinite(buyState.cost) ? `${formatNumber(buyState.cost)}T` : "MAX";
-          const state = buyState.buyable ? "BUY" : (buyState.locked ? "LOCKED" : "MAX");
+          const state = buyState.buyable ? "BUY" : (buyState.insufficient ? "NEED" : (buyState.locked ? "LOCKED" : "MAX"));
           slot.innerHTML = `
             <div class="slot-buy-card">
               <div class="slot-buy-icon">+</div>
@@ -213,8 +217,8 @@ const UI = {
             <div class="slot-buy-state">${state}</div>
             <div class="slot-buy-note">${buyState.shortDetail || ""}</div>
           `;
-          slot.onclick = () => {
-            if (this.handlePlayingUiLaunch()) return;
+          slot.onclick = (event) => {
+            event.stopPropagation();
             this.handleEmptyBallSlotClick(i);
           };
           continue;
@@ -340,7 +344,7 @@ const UI = {
         `<span class="${owned && index < hp && !broken ? "on" : ""}"></span>`
       )).join("");
       const bumperSelected = false;
-      bumperSlot.className = `slot ${owned ? "has-skills" : ""} ${broken ? "fallen" : ""} ${buyState.buyable ? "buyable" : ""} ${buyState.locked ? "locked" : ""} ${bumperSelected ? "selected-upgrade" : ""}`;
+      bumperSlot.className = `slot ${owned ? "has-skills" : ""} ${broken ? "fallen" : ""} ${buyState.buyable ? "buyable" : ""} ${buyState.locked ? "locked" : ""} ${buyState.insufficient ? "insufficient" : ""} ${bumperSelected ? "selected-upgrade" : ""}`;
       bumperSlot.style.borderColor = "";
       bumperSlot.style.setProperty("--selected-color", firstBumper ? firstBumper.color : "#67d8ff");
       if (!owned) {
@@ -384,12 +388,14 @@ const UI = {
     const nextBallNumber = balls.length + 1;
     const cost = getBallPurchaseCost(ballNumber);
     const price = Number.isFinite(cost) ? `PRICE ${formatNumber(cost)}T` : "MAX";
+    const tokens = typeof Game !== "undefined" ? Number(Game.tokens || 0) : 0;
+    const affordable = Number.isFinite(cost) && tokens >= cost;
     const bumperUnlocked = typeof Game !== "undefined" && Game.bumper && Game.bumper.unlocked;
     const bumperBonus = ballNumber >= 2
       ? `<span class="slot-lock">${bumperUnlocked ? `+ BUMPER LV ${Math.min(ballNumber, BALL_MAX - 1)}` : `BUMPER ${formatNumber(BUMPER_UNLOCK_COST)}T`}</span>`
       : "";
     if (!this.canBuyBallInCurrentPhase()) {
-      return { label: "EMPTY", detail: "NO SKILL", shortDetail: "NO SKILL", buyable: false, locked: false, cost };
+      return { label: "EMPTY", detail: "NO SKILL", shortDetail: "NO SKILL", buyable: false, locked: false, insufficient: false, cost };
     }
     if (ballNumber !== nextBallNumber) {
       return {
@@ -398,15 +404,17 @@ const UI = {
         shortDetail: `BALL ${nextBallNumber} FIRST`,
         buyable: false,
         locked: true,
+        insufficient: false,
         cost
       };
     }
     return {
-      label: `BUY ${formatNumber(cost)}T`,
+      label: affordable ? `BUY ${formatNumber(cost)}T` : `NEED ${formatNumber(cost)}T`,
       detail: `<span class="slot-price">${price}</span><span class="slot-lock">BALL ${ballNumber}</span>${bumperBonus}`,
-      shortDetail: "AVAILABLE",
-      buyable: Number.isFinite(cost),
+      shortDetail: affordable ? "AVAILABLE" : `${formatNumber(Math.max(0, cost - tokens))}T SHORT`,
+      buyable: affordable,
       locked: false,
+      insufficient: Number.isFinite(cost) && !affordable,
       cost
     };
   },
@@ -447,18 +455,21 @@ const UI = {
     if (!unlocked) {
       const canBuy = this.canBuyBumperInCurrentPhase();
       const price = formatNumber(BUMPER_UNLOCK_COST);
+      const affordable = typeof Game !== "undefined" && Number(Game.tokens || 0) >= BUMPER_UNLOCK_COST;
       return {
-        label: canBuy ? `BUY ${price}T` : "LOCKED",
+        label: canBuy ? (affordable ? `BUY ${price}T` : `NEED ${price}T`) : "LOCKED",
         detail: `<span class="slot-price">PRICE ${price}T</span>`,
-        buyable: canBuy,
-        locked: !canBuy
+        buyable: canBuy && affordable,
+        locked: !canBuy,
+        insufficient: canBuy && !affordable
       };
     }
     return {
       label: `Lv ${level}`,
       detail: level >= autoMax ? "AUTO MAX" : `NEXT: BALL ${level + 2}`,
       buyable: false,
-      locked: false
+      locked: false,
+      insufficient: false
     };
   },
 
@@ -509,6 +520,22 @@ const UI = {
   skillDisplayName(skill) {
     if (!skill) return "SKILL";
     return SLOT_SKILL_LABELS[skill.id] || skill.shortName || skill.name || skill.id || "SKILL";
+  },
+
+  escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  },
+
+  safeCssColor(value) {
+    const color = String(value || "").trim();
+    if (/^#[0-9a-fA-F]{3,8}$/.test(color)) return color;
+    if (/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/.test(color)) return color;
+    return "var(--accent-blue)";
   },
 
   skillDescription(choice) {
@@ -938,6 +965,26 @@ const UI = {
         this.renderSlots(Game.balls, Game.paddle);
       });
     });
+    list.querySelectorAll(".upgrade-target-choice").forEach((button) => {
+      button.addEventListener("click", () => {
+        const type = button.dataset.type || "ball";
+        const index = Number(button.dataset.index || 0);
+        if (type === "ball") {
+          this.selectUpgradeTarget("ball", index);
+          return;
+        }
+        if (type === "bumper") {
+          this.handleBumperSlotClick(Game.bumper);
+        }
+      });
+    });
+    list.querySelector(".btn-bumper-buy")?.addEventListener("click", () => {
+      const bought = Game.buyBumperLevelWithTokens();
+      if (bought) AudioSystem.playUiSuccess();
+      this.renderUpgradePanel();
+      if (bought) this.flashUpgradeList("upgrade-success");
+      this.renderSlots(Game.balls, Game.paddle);
+    });
   },
 
   flashUpgradeList(className) {
@@ -1021,11 +1068,14 @@ const UI = {
       const ball = balls[i];
       const selected = target.type === "ball" && target.index === i;
       const color = ball ? (ball.skills[0] ? ball.skills[0].color : ball.color) : "rgba(255,255,255,0.24)";
+      const buyState = ball ? null : this.getBallPurchaseSlotState(i, balls);
+      const canBuyEmpty = !ball && buyState && buyState.buyable;
+      const emptyLabel = canBuyEmpty ? "BUY" : (buyState && buyState.insufficient ? "NEED" : (buyState && buyState.locked ? "LOCK" : "EMPTY"));
       choices.push(`
-        <button class="upgrade-target-choice ${selected ? "selected" : ""} ${ball ? "" : "empty"}" type="button" data-type="ball" data-index="${i}" style="--target-color:${color}" ${ball ? "" : "disabled"}>
+        <button class="upgrade-target-choice ${selected ? "selected" : ""} ${ball ? "" : "empty"} ${canBuyEmpty ? "buyable" : ""} ${buyState && buyState.insufficient ? "insufficient" : ""}" type="button" data-type="ball" data-index="${i}" style="--target-color:${color}">
           <span class="upgrade-target-choice-icon" style="${ball ? this.ballIconStyle(ball) : "background:rgba(255,255,255,0.1);box-shadow:none"}"></span>
           <span class="upgrade-target-choice-label">B${i + 1}</span>
-          <span class="upgrade-target-choice-state">${ball ? `${ball.skills.length}/3` : "EMPTY"}</span>
+          <span class="upgrade-target-choice-state">${ball ? `${ball.skills.length}/3` : emptyLabel}</span>
         </button>
       `);
     }
@@ -1284,15 +1334,233 @@ const UI = {
 
   showSettings() {
     const title = document.getElementById("screen-title");
+    const settings = typeof Game !== "undefined" && Game.getInputSettings
+      ? Game.getInputSettings()
+      : { mode: "direct", sensitivity: 1 };
+    const sensitivity = Math.round((settings.sensitivity || 1) * 100);
     title.innerHTML = `
-      <div class="simple-card">
+      <div class="simple-card settings-card">
         <p class="simple-title">SETTINGS</p>
-        <p class="simple-line">SOUND: READY</p>
-        <p class="simple-line">INPUT: TOUCH / POINTER</p>
+        <div class="settings-group">
+          <div class="settings-head">
+            <span>CONTROL</span>
+            <b id="setting-control-label">${settings.mode === "drag" ? "DRAG" : "DIRECT"}</b>
+          </div>
+          <div class="settings-segmented" role="group" aria-label="control mode">
+            <button class="settings-option ${settings.mode === "direct" ? "active" : ""}" type="button" data-mode="direct">DIRECT</button>
+            <button class="settings-option ${settings.mode === "drag" ? "active" : ""}" type="button" data-mode="drag">DRAG</button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-head">
+            <span>SENSITIVITY</span>
+            <b id="setting-sensitivity-value">${sensitivity}%</b>
+          </div>
+          <input id="setting-sensitivity" class="settings-range" type="range" min="60" max="160" step="5" value="${sensitivity}">
+        </div>
         <div class="simple-divider"></div>
         <button class="btn-sub" id="btn-back">BACK</button>
       </div>
     `;
+    const applySettings = () => {
+      const active = title.querySelector(".settings-option.active");
+      const range = document.getElementById("setting-sensitivity");
+      const next = typeof Game !== "undefined" && Game.setInputSettings
+        ? Game.setInputSettings({
+          mode: active ? active.dataset.mode : "direct",
+          sensitivity: Number(range ? range.value : 100) / 100
+        })
+        : { mode: "direct", sensitivity: 1 };
+      const label = document.getElementById("setting-control-label");
+      const value = document.getElementById("setting-sensitivity-value");
+      if (label) label.textContent = next.mode === "drag" ? "DRAG" : "DIRECT";
+      if (value) value.textContent = `${Math.round(next.sensitivity * 100)}%`;
+    };
+    title.querySelectorAll(".settings-option").forEach((button) => {
+      button.addEventListener("click", () => {
+        title.querySelectorAll(".settings-option").forEach((node) => node.classList.remove("active"));
+        button.classList.add("active");
+        AudioSystem.playUiOpen();
+        applySettings();
+      });
+    });
+    document.getElementById("setting-sensitivity").addEventListener("input", applySettings);
+    document.getElementById("btn-back").addEventListener("click", () => this.initTitle());
+  },
+
+  accountSkillSummaryHtml(run) {
+    const snapshot = run && run.skills ? run.skills : null;
+    if (!snapshot) return `<p class="account-muted">NO BEST RUN YET</p>`;
+    const rows = [];
+    const addRow = (section) => {
+      if (!section || !Array.isArray(section.skills) || section.skills.length === 0) return;
+      rows.push({
+        label: section.label || "SKILL",
+        color: section.color || "var(--accent-blue)",
+        skills: section.skills
+      });
+    };
+    if (Array.isArray(snapshot.balls)) snapshot.balls.forEach(addRow);
+    addRow(snapshot.paddle);
+    addRow(snapshot.bumper);
+    if (rows.length === 0) return `<p class="account-muted">NO SKILLS SAVED</p>`;
+    return rows.map((row) => {
+      const skills = row.skills
+        .map((skill) => `${this.escapeHtml(skill.name || skill.id || "SKILL")} LV ${Number(skill.level || 1)}`)
+        .join(" / ");
+      return `
+        <div class="account-skill-line" style="--account-skill-color:${this.safeCssColor(row.color)}">
+          <b>${this.escapeHtml(row.label)}</b>
+          <span>${skills}</span>
+        </div>
+      `;
+    }).join("");
+  },
+
+  mountGoogleAccountButton() {
+    if (typeof AccountManager === "undefined" || !AccountManager.isConfigured()) return;
+    const mount = (attempt = 0) => {
+      const container = document.getElementById("google-signin-button");
+      if (!container) return;
+      const status = document.getElementById("google-signin-status");
+      const ready = AccountManager.renderGoogleButton(
+        container,
+        () => {
+          AudioSystem.playUiSuccess();
+          this.showToast("ACCOUNT LINKED");
+          this.showAccount();
+        },
+        (message) => {
+          if (status) status.textContent = attempt < 10 ? "LOADING GOOGLE" : String(message || "GOOGLE ERROR").toUpperCase();
+        }
+      );
+      if (!ready && attempt < 12) {
+        setTimeout(() => mount(attempt + 1), 250);
+      }
+    };
+    requestAnimationFrame(() => mount());
+  },
+
+  showAccount() {
+    const title = document.getElementById("screen-title");
+    if (typeof AccountManager === "undefined") {
+      title.innerHTML = `
+        <div class="simple-card account-card">
+          <p class="simple-title">ACCOUNT</p>
+          <p class="account-muted">ACCOUNT SYSTEM UNAVAILABLE</p>
+          <div class="simple-divider"></div>
+          <button class="btn-sub" id="btn-back">BACK</button>
+        </div>
+      `;
+      document.getElementById("btn-back").addEventListener("click", () => this.initTitle());
+      return;
+    }
+
+    const account = AccountManager.getCurrentAccount();
+    const configured = AccountManager.isConfigured();
+    if (!account) {
+      title.innerHTML = `
+        <div class="simple-card account-card">
+          <p class="simple-title">ACCOUNT</p>
+          <div class="account-connect-row">
+            <span class="account-status-dot ${configured ? "ready" : ""}"></span>
+            <b>${configured ? "GOOGLE READY" : "GOOGLE SETUP"}</b>
+          </div>
+          ${configured
+            ? `
+              <div class="google-signin-wrap">
+                <div id="google-signin-button"></div>
+                <p class="account-muted" id="google-signin-status">GOOGLE SIGN-IN</p>
+              </div>
+            `
+            : `
+              <div class="settings-group">
+                <div class="settings-head">
+                  <span>GOOGLE CLIENT ID</span>
+                  <b>REQUIRED</b>
+                </div>
+                <input id="account-client-id" class="account-input" type="text" value="${this.escapeHtml(AccountManager.getClientId())}" placeholder="GOOGLE CLIENT ID">
+                <button class="btn-sub account-full-button" id="btn-save-client-id" type="button">SET CLIENT ID</button>
+              </div>
+            `}
+          <div class="simple-divider"></div>
+          <button class="btn-sub" id="btn-back">BACK</button>
+        </div>
+      `;
+      if (configured) {
+        this.mountGoogleAccountButton();
+      } else {
+        const saveClientButton = document.getElementById("btn-save-client-id");
+        if (saveClientButton) {
+          saveClientButton.addEventListener("click", () => {
+            const input = document.getElementById("account-client-id");
+            AccountManager.saveLocalClientId(input ? input.value : "");
+            AudioSystem.playUiSuccess();
+            this.showAccount();
+          });
+        }
+      }
+      document.getElementById("btn-back").addEventListener("click", () => this.initTitle());
+      return;
+    }
+
+    const initial = this.escapeHtml((account.username || "P").slice(0, 1).toUpperCase());
+    const avatar = account.picture
+      ? `<img src="${this.escapeHtml(account.picture)}" alt="">`
+      : `<span>${initial}</span>`;
+    const bestDate = account.bestRun && account.bestRun.date
+      ? new Date(account.bestRun.date).toLocaleDateString()
+      : "NO RUN";
+    title.innerHTML = `
+      <div class="simple-card account-card">
+        <p class="simple-title">ACCOUNT</p>
+        <div class="account-profile">
+          <div class="account-avatar">${avatar}</div>
+          <div class="account-profile-main">
+            <span>GOOGLE LINKED</span>
+            <b>${this.escapeHtml(account.username || "PLAYER")}</b>
+            <em>${this.escapeHtml(account.email || account.googleName || "")}</em>
+          </div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-head">
+            <span>USERNAME</span>
+            <b>${String(account.username || "").length}/16</b>
+          </div>
+          <input id="account-username" class="account-input" type="text" maxlength="16" value="${this.escapeHtml(account.username || "")}">
+        </div>
+        <div class="account-records">
+          <span><b>${formatNumber(account.highScore || 0)}</b><em>HIGH SCORE</em></span>
+          <span><b>${formatNumber(account.bestBlocks || 0)}</b><em>BEST BLOCKS</em></span>
+          <span><b>${this.escapeHtml(bestDate)}</b><em>BEST RUN</em></span>
+        </div>
+        <div class="account-skill-list">
+          ${this.accountSkillSummaryHtml(account.bestRun)}
+        </div>
+        <div class="simple-divider"></div>
+        <div class="account-actions">
+          <button class="btn-sub" id="btn-account-save">SAVE</button>
+          <button class="btn-sub" id="btn-account-signout">SIGN OUT</button>
+          <button class="btn-sub" id="btn-back">BACK</button>
+        </div>
+      </div>
+    `;
+    document.getElementById("btn-account-save").addEventListener("click", () => {
+      const input = document.getElementById("account-username");
+      try {
+        AccountManager.saveUsername(input ? input.value : "");
+        AudioSystem.playUiSuccess();
+        this.showToast("USERNAME SAVED");
+        this.showAccount();
+      } catch (error) {
+        this.showToast("USERNAME 2+ CHARS");
+      }
+    });
+    document.getElementById("btn-account-signout").addEventListener("click", () => {
+      AccountManager.signOut();
+      AudioSystem.playUiOpen();
+      this.showAccount();
+    });
     document.getElementById("btn-back").addEventListener("click", () => this.initTitle());
   },
 

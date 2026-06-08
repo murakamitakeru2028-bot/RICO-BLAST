@@ -42,6 +42,17 @@ const Game = {
   resumeInvincibleDuration: 2,
   awaitingStartClick: false,
   grantInvincibleOnStartClick: false,
+  inputSettingsLoaded: false,
+  inputSettings: {
+    mode: "direct",
+    sensitivity: 1
+  },
+  inputDrag: {
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startTargetX: 0
+  },
 
   init() {
     clearTimeout(this.phaseTimeout);
@@ -93,6 +104,7 @@ const Game = {
     this.paddle = new Paddle();
     this.paddle.setMaxHp(this.getPaddleMaxHp());
     this.bumper = new Bumper();
+    this.loadInputSettings();
     this.setupCanvas();
     this.setupInput();
     this.setupHudControls();
@@ -135,16 +147,53 @@ const Game = {
       const rect = this.canvas.getBoundingClientRect();
       return ((clientX - rect.left) / Math.max(1, rect.width)) * this.width;
     };
-    const update = (clientX) => {
+    const getSettings = () => this.getInputSettings();
+    const updateDirect = (clientX) => {
       if (!this.paddle || currentState !== STATE.PLAYING || this.paused) return;
       this.paddle.onTouch(clamp(toGameX(clientX), 0, this.width));
+    };
+    const startDrag = (clientX, pointerId = null) => {
+      if (!this.paddle || currentState !== STATE.PLAYING || this.paused) return;
+      const settings = getSettings();
+      if (settings.mode === "drag") {
+        this.inputDrag.active = true;
+        this.inputDrag.pointerId = pointerId;
+        this.inputDrag.startX = toGameX(clientX);
+        this.inputDrag.startTargetX = this.paddle.targetX || (this.paddle.x + this.paddle.getWidth() / 2);
+        return;
+      }
+      updateDirect(clientX);
+    };
+    const updateInput = (clientX, pointerId = null) => {
+      if (!this.paddle || currentState !== STATE.PLAYING || this.paused) return;
+      const settings = getSettings();
+      if (settings.mode !== "drag") {
+        updateDirect(clientX);
+        return;
+      }
+      if (!this.inputDrag.active) return;
+      if (this.inputDrag.pointerId !== null && pointerId !== null && this.inputDrag.pointerId !== pointerId) return;
+      const delta = (toGameX(clientX) - this.inputDrag.startX) * settings.sensitivity;
+      this.paddle.onTouch(clamp(this.inputDrag.startTargetX + delta, 0, this.width));
+    };
+    const endDrag = (pointerId = null) => {
+      if (this.inputDrag.pointerId !== null && pointerId !== null && this.inputDrag.pointerId !== pointerId) return;
+      this.inputDrag.active = false;
+      this.inputDrag.pointerId = null;
     };
     const bindInputZone = (zone, { launch = false, prevent = false } = {}) => {
       if (!zone) return;
       zone.addEventListener("pointerdown", (event) => {
         if (prevent) event.preventDefault();
         AudioSystem.unlock();
-        update(event.clientX);
+        startDrag(event.clientX, event.pointerId);
+        if (event.currentTarget && event.currentTarget.setPointerCapture) {
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch (error) {
+            // Some browsers reject pointer capture on non-primary touches.
+          }
+        }
         if (launch) {
           this.releaseStartClickHold();
           this.launchNextReadyBall();
@@ -152,21 +201,27 @@ const Game = {
       });
       zone.addEventListener("pointermove", (event) => {
         if (prevent) event.preventDefault();
-        update(event.clientX);
+        updateInput(event.clientX, event.pointerId);
       });
-      zone.addEventListener("touchstart", (event) => {
-        if (prevent) event.preventDefault();
-        AudioSystem.unlock();
-        if (event.touches[0]) update(event.touches[0].clientX);
-        if (launch) {
-          this.releaseStartClickHold();
-          this.launchNextReadyBall();
-        }
-      }, { passive: !prevent });
-      zone.addEventListener("touchmove", (event) => {
-        if (prevent) event.preventDefault();
-        if (event.touches[0]) update(event.touches[0].clientX);
-      }, { passive: !prevent });
+      zone.addEventListener("pointerup", (event) => endDrag(event.pointerId));
+      zone.addEventListener("pointercancel", (event) => endDrag(event.pointerId));
+      if (typeof window !== "undefined" && !window.PointerEvent) {
+        zone.addEventListener("touchstart", (event) => {
+          if (prevent) event.preventDefault();
+          AudioSystem.unlock();
+          if (event.touches[0]) startDrag(event.touches[0].clientX);
+          if (launch) {
+            this.releaseStartClickHold();
+            this.launchNextReadyBall();
+          }
+        }, { passive: !prevent });
+        zone.addEventListener("touchmove", (event) => {
+          if (prevent) event.preventDefault();
+          if (event.touches[0]) updateInput(event.touches[0].clientX);
+        }, { passive: !prevent });
+        zone.addEventListener("touchend", () => endDrag());
+        zone.addEventListener("touchcancel", () => endDrag());
+      }
     };
 
     bindInputZone(this.canvas, { launch: true, prevent: true });
@@ -174,7 +229,50 @@ const Game = {
     bindInputZone(document.getElementById("paddle-hp"), { launch: true });
     bindInputZone(document.getElementById("slot-bar"), { launch: true });
     bindInputZone(document.getElementById("paddle-status"), { launch: true });
+    window.addEventListener("pointerup", (event) => endDrag(event.pointerId));
+    window.addEventListener("pointercancel", (event) => endDrag(event.pointerId));
     this.inputReady = true;
+  },
+
+  loadInputSettings() {
+    if (this.inputSettingsLoaded) return this.inputSettings;
+    const defaults = { mode: "direct", sensitivity: 1 };
+    let mode = defaults.mode;
+    let sensitivity = defaults.sensitivity;
+    try {
+      mode = localStorage.getItem("ricoBlast_inputMode") || defaults.mode;
+      sensitivity = Number(localStorage.getItem("ricoBlast_inputSensitivity") || defaults.sensitivity);
+    } catch (error) {
+      mode = defaults.mode;
+      sensitivity = defaults.sensitivity;
+    }
+    this.inputSettings = {
+      mode: mode === "drag" ? "drag" : "direct",
+      sensitivity: clamp(Number.isFinite(sensitivity) ? sensitivity : defaults.sensitivity, 0.6, 1.6)
+    };
+    this.inputSettingsLoaded = true;
+    return this.inputSettings;
+  },
+
+  getInputSettings() {
+    return this.loadInputSettings();
+  },
+
+  setInputSettings(nextSettings = {}) {
+    const current = this.getInputSettings();
+    this.inputSettings = {
+      mode: nextSettings.mode === "drag" ? "drag" : (nextSettings.mode === "direct" ? "direct" : current.mode),
+      sensitivity: clamp(Number.isFinite(Number(nextSettings.sensitivity)) ? Number(nextSettings.sensitivity) : current.sensitivity, 0.6, 1.6)
+    };
+    this.inputDrag.active = false;
+    this.inputDrag.pointerId = null;
+    try {
+      localStorage.setItem("ricoBlast_inputMode", this.inputSettings.mode);
+      localStorage.setItem("ricoBlast_inputSensitivity", String(this.inputSettings.sensitivity));
+    } catch (error) {
+      // Settings still apply for the current session when storage is blocked.
+    }
+    return this.inputSettings;
   },
 
   setupHudControls() {
@@ -245,6 +343,7 @@ const Game = {
     this.projectiles = [];
     this.zones = [];
     this.difficultyLevel += 1;
+    this.blockSpawnTimer = 0;
     if (this.blocks.length === 0) this.createBlocks();
     else this.syncBlockGridPositions();
     this.paddle.setPosition(this.width, this.height);
@@ -491,7 +590,11 @@ const Game = {
   },
 
   getBlockSpawnBandRows() {
-    return Object.values(Block.types || {}).reduce((maxRows, definition) => {
+    const activeTypes = this.getBlockTypeWeights()
+      .filter(([, weight]) => weight > 0)
+      .map(([type]) => type);
+    return activeTypes.reduce((maxRows, type) => {
+      const definition = Block.types[type] || Block.types.stone;
       return Math.max(maxRows, Math.max(1, definition.gridSpanRows || 1));
     }, 1);
   },
@@ -725,7 +828,7 @@ const Game = {
       return;
     }
     this.removeEscapedBlocks();
-    this.updateBlockSpawning();
+    this.updateBlockSpawning(dt);
 
     this.updateHud();
     UI.renderSlots(this.balls, this.paddle);
@@ -765,7 +868,9 @@ const Game = {
 
   getBlockDescendSpeed() {
     const wave = Math.max(1, this.difficultyLevel || 1);
-    const ramp = Math.min(0.012, Math.max(0, wave - 4) * 0.00075);
+    const earlyRamp = Math.max(0, wave - 2) * 0.001;
+    const lateRamp = Math.max(0, wave - 12) * 0.00045;
+    const ramp = Math.min(0.02, earlyRamp + lateRamp);
     return 0.09 + ramp;
   },
 
@@ -775,22 +880,27 @@ const Game = {
     this.syncBlockGridPositions();
   },
 
-  updateBlockSpawning() {
+  getBlockSpawnCooldown() {
+    return 0.14;
+  },
+
+  updateBlockSpawning(dt = 0) {
     const layout = this.getBlockLayout();
     const pitch = this.getBlockRowPitch(layout);
-    let guard = 0;
-    while (this.blocks.length < this.getMaxActiveBlocks() && guard < 6) {
+    this.blockSpawnTimer = Math.max(0, this.blockSpawnTimer - Math.max(0, dt || 0));
+    if (this.blocks.length < this.getMaxActiveBlocks() && this.blockSpawnTimer <= 0) {
       const topRow = this.getTopmostBlockRow();
       if (topRow === null) {
         this.createBlocks();
-        break;
+      } else {
+        const topY = this.getBlockY(topRow, layout);
+        if (topY >= this.getBlockStartY() + pitch * this.getBlockSpawnLeadRatio()) {
+          const endRow = topRow - 1;
+          const startRow = endRow - this.getBlockSpawnBandRows() + 1;
+          this.spawnBlockBand(startRow, endRow, layout);
+          this.blockSpawnTimer = this.getBlockSpawnCooldown();
+        }
       }
-      const topY = this.getBlockY(topRow, layout);
-      if (topY < this.getBlockStartY() + pitch * this.getBlockSpawnLeadRatio()) break;
-      const endRow = topRow - 1;
-      const startRow = endRow - this.getBlockSpawnBandRows() + 1;
-      this.spawnBlockBand(startRow, endRow, layout);
-      guard += 1;
     }
     this.syncBlockGridPositions();
   },
@@ -816,9 +926,10 @@ const Game = {
   getBaseBlockHp(level = 1) {
     const step = Math.max(0, level - 1);
     const wave = Math.max(1, level);
-    const midWaveRamp = Math.max(0, wave - 12) * 0.012;
-    const lateWaveRamp = Math.max(0, wave - 24) * 0.015;
-    return Math.floor(100 * Math.pow(1.21, step) * (1 + midWaveRamp + lateWaveRamp));
+    const earlyWaveRamp = Math.max(0, wave - 5) * 0.006;
+    const midWaveRamp = Math.max(0, wave - 10) * 0.012;
+    const lateWaveRamp = Math.max(0, wave - 20) * 0.016;
+    return Math.floor(100 * Math.pow(1.21, step) * (1 + earlyWaveRamp + midWaveRamp + lateWaveRamp));
   },
 
   getPaddleMaxHp() {
@@ -1539,11 +1650,20 @@ const Game = {
     }
 
     const radius = projectile.radius || 1;
-    const rect = block.collisionRect;
-    if (normalX < 0) projectile.x = rect.x - radius - 0.5;
-    else if (normalX > 0) projectile.x = rect.x + rect.width + radius + 0.5;
-    if (normalY < 0) projectile.y = rect.y - radius - 0.5;
-    else if (normalY > 0) projectile.y = rect.y + rect.height + radius + 0.5;
+    const hasContact = collision &&
+      Number.isFinite(collision.contactX) &&
+      Number.isFinite(collision.contactY);
+    if (hasContact) {
+      const skin = 0.6;
+      projectile.x = collision.contactX + normalX * skin;
+      projectile.y = collision.contactY + normalY * skin;
+    } else {
+      const rect = block.collisionRect;
+      if (normalX < 0) projectile.x = rect.x - radius - 0.5;
+      else if (normalX > 0) projectile.x = rect.x + rect.width + radius + 0.5;
+      if (normalY < 0) projectile.y = rect.y - radius - 0.5;
+      else if (normalY > 0) projectile.y = rect.y + rect.height + radius + 0.5;
+    }
 
     const speed = Math.hypot(projectile.vx, projectile.vy) || 1;
     const dot = projectile.vx * normalX + projectile.vy * normalY;
@@ -1992,6 +2112,34 @@ const Game = {
     this.showUpgradeScreen();
   },
 
+  getRunSkillSnapshot() {
+    const readSkills = (entity) => {
+      if (!entity || !Array.isArray(entity.skills)) return [];
+      return entity.skills.map((skill) => ({
+        id: skill.id || "",
+        name: skill.name || skill.id || "SKILL",
+        level: Number(skill.level || 1)
+      }));
+    };
+    return {
+      balls: this.balls.map((ball, index) => ({
+        label: `BALL ${index + 1}`,
+        color: ball.color || "#ffffff",
+        skills: readSkills(ball)
+      })),
+      paddle: {
+        label: "PADDLE",
+        skills: readSkills(this.paddle)
+      },
+      bumper: this.bumper && this.bumper.unlocked
+        ? {
+          label: "BUMPER",
+          skills: readSkills(this.bumper)
+        }
+        : null
+    };
+  },
+
   gameOver() {
     if (currentState !== STATE.PLAYING) return;
     Effects.shakeScreen(5, 0.3);
@@ -2000,6 +2148,14 @@ const Game = {
     const bestBlocks = Math.max(Number(localStorage.getItem("ricoBlast_bestBlocks") || 0), this.totalBlocksDestroyed);
     localStorage.setItem("ricoBlast_highScore", String(highScore));
     localStorage.setItem("ricoBlast_bestBlocks", String(bestBlocks));
+    if (typeof AccountManager !== "undefined") {
+      AccountManager.recordRun({
+        score: this.score,
+        blocksDestroyed: this.totalBlocksDestroyed,
+        date: new Date().toISOString(),
+        skills: this.getRunSkillSnapshot()
+      });
+    }
     setState(STATE.REWARD_READY);
     this.phaseTimeout = setTimeout(() => {
       UI.showGameOver(this.score, this.totalBlocksDestroyed, highScore, bestBlocks);

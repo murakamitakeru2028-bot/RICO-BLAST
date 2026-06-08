@@ -1,4 +1,4 @@
-const CACHE_NAME = "rico-blast-pwa-v1";
+const CACHE_NAME = "rico-blast-pwa-v2";
 
 const APP_SHELL = [
   "./",
@@ -14,6 +14,8 @@ const APP_SHELL = [
   "./js/bumper.js",
   "./js/tokens.js",
   "./js/effects.js",
+  "./js/google-config.js",
+  "./js/account.js",
   "./js/ui.js",
   "./js/game.js",
   "./js/pwa.js",

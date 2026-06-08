@@ -680,6 +680,38 @@ function getCircleRectOverlap(cx, cy, radius, rect) {
   return { hit: true, t: 1, normalX: 0, normalY: 1, penetration: radius + bottom, contactX: cx, contactY: cy };
 }
 
+function getSegmentCircleCollision(prevX, prevY, x, y, cx, cy, radius) {
+  const dx = x - prevX;
+  const dy = y - prevY;
+  const fx = prevX - cx;
+  const fy = prevY - cy;
+  const a = dx * dx + dy * dy;
+  if (a < 0.0001) return null;
+  const b = 2 * (fx * dx + fy * dy);
+  const c = fx * fx + fy * fy - radius * radius;
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant < 0) return null;
+  const root = Math.sqrt(discriminant);
+  const t1 = (-b - root) / (2 * a);
+  const t2 = (-b + root) / (2 * a);
+  const t = t1 >= 0 && t1 <= 1 ? t1 : (t2 >= 0 && t2 <= 1 ? t2 : null);
+  if (t === null) return null;
+  const contactX = prevX + dx * t;
+  const contactY = prevY + dy * t;
+  const nx = contactX - cx;
+  const ny = contactY - cy;
+  const length = Math.hypot(nx, ny) || 1;
+  return {
+    hit: true,
+    t,
+    normalX: nx / length,
+    normalY: ny / length,
+    penetration: 0,
+    contactX,
+    contactY
+  };
+}
+
 function getSweptPointRectCollision(prevX, prevY, x, y, rect) {
   const dx = x - prevX;
   const dy = y - prevY;
@@ -708,14 +740,47 @@ function getSweptPointRectCollision(prevX, prevY, x, y, rect) {
 }
 
 function getCircleRectCollision(prevX, prevY, x, y, radius, rect) {
+  const startOverlap = getCircleRectOverlap(prevX, prevY, radius, rect);
+  if (startOverlap) {
+    startOverlap.t = 0;
+    return startOverlap;
+  }
+
   const expanded = {
     x: rect.x - radius,
     y: rect.y - radius,
     width: rect.width + radius * 2,
     height: rect.height + radius * 2
   };
+  const candidates = [];
   const swept = getSweptPointRectCollision(prevX, prevY, x, y, expanded);
-  if (swept) return swept;
+  if (swept) {
+    const edgeEpsilon = 0.001;
+    const onVerticalFace = swept.normalX !== 0 &&
+      swept.contactY > rect.y + edgeEpsilon &&
+      swept.contactY < rect.y + rect.height - edgeEpsilon;
+    const onHorizontalFace = swept.normalY !== 0 &&
+      swept.contactX > rect.x + edgeEpsilon &&
+      swept.contactX < rect.x + rect.width - edgeEpsilon;
+    if (onVerticalFace || onHorizontalFace) candidates.push(swept);
+  }
+
+  const corners = [
+    [rect.x, rect.y],
+    [rect.x + rect.width, rect.y],
+    [rect.x, rect.y + rect.height],
+    [rect.x + rect.width, rect.y + rect.height]
+  ];
+  for (const [cornerX, cornerY] of corners) {
+    const cornerHit = getSegmentCircleCollision(prevX, prevY, x, y, cornerX, cornerY, radius);
+    if (cornerHit) candidates.push(cornerHit);
+  }
+
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => a.t - b.t);
+    return candidates[0];
+  }
+
   return getCircleRectOverlap(x, y, radius, rect);
 }
 

@@ -683,6 +683,20 @@ button {
   opacity: 0.48;
 }
 
+#slot-bar .slot.store-empty.insufficient {
+  opacity: 0.72;
+  border-color: rgba(246,251,255,0.14);
+  background:
+    linear-gradient(180deg, rgba(246,251,255,0.045), rgba(255,255,255,0.01)),
+    #10131f;
+}
+
+#slot-bar .slot.store-empty.insufficient .slot-buy-icon {
+  border-color: rgba(246,251,255,0.18);
+  background: rgba(246,251,255,0.055);
+  color: var(--text-muted);
+}
+
 .slot-buy-card {
   min-width: 0;
   display: grid;
@@ -1066,6 +1080,16 @@ button {
 .slot.buyable .slot-name {
   color: var(--token-color);
   font-family: "Space Mono", monospace;
+}
+
+.slot.insufficient {
+  border-color: rgba(246,251,255,0.14);
+  opacity: 0.64;
+}
+
+.slot.insufficient .slot-name,
+.slot.insufficient .slot-lv {
+  color: var(--text-muted);
 }
 
 .slot.locked {
@@ -2670,6 +2694,43 @@ button {
   cursor: not-allowed;
 }
 
+.upgrade-target-choice.empty.buyable {
+  opacity: 1;
+  cursor: pointer;
+  border-color: rgba(124, 245, 178, 0.36);
+  background:
+    linear-gradient(180deg, rgba(124, 245, 178, 0.12), rgba(103, 216, 255, 0.035)),
+    rgba(21,21,41,0.72);
+}
+
+.upgrade-target-choice.empty.buyable .upgrade-target-choice-icon {
+  position: relative;
+  border-color: rgba(124, 245, 178, 0.52);
+  background: rgba(124, 245, 178, 0.08) !important;
+}
+
+.upgrade-target-choice.empty.buyable .upgrade-target-choice-icon::before,
+.upgrade-target-choice.empty.buyable .upgrade-target-choice-icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 2px;
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+  background: var(--accent-green);
+}
+
+.upgrade-target-choice.empty.buyable .upgrade-target-choice-icon::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.upgrade-target-choice.empty.insufficient {
+  opacity: 0.5;
+  cursor: pointer;
+}
+
 .upgrade-target-choice-icon {
   width: 16px;
   height: 16px;
@@ -3591,17 +3652,20 @@ button {
 
 .title-secondary-buttons {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
 .title-secondary-buttons.install-ready {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .title-shell .btn-sub {
   height: 42px;
   font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gameover-card,
@@ -3657,6 +3721,304 @@ button {
   height: 1px;
   margin: 16px 0;
   background: var(--line-normal);
+}
+
+.settings-card {
+  text-align: left;
+}
+
+.settings-card .simple-title {
+  text-align: center;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.settings-head b {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.settings-segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line-subtle);
+  border-radius: 8px;
+  background: rgba(4, 8, 14, 0.26);
+}
+
+.settings-option {
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settings-option.active {
+  border-color: rgba(124, 245, 178, 0.62);
+  background:
+    linear-gradient(180deg, rgba(124, 245, 178, 0.18), rgba(103, 216, 255, 0.07)),
+    rgba(21, 21, 41, 0.82);
+  color: var(--text-primary);
+  box-shadow: 0 0 18px rgba(124, 245, 178, 0.14);
+}
+
+.settings-range {
+  width: 100%;
+  accent-color: var(--accent-green);
+  cursor: pointer;
+}
+
+.account-card {
+  max-width: 420px;
+  text-align: left;
+}
+
+.account-card .simple-title {
+  text-align: center;
+}
+
+.account-connect-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 42px;
+  border: 1px solid var(--line-subtle);
+  border-radius: 8px;
+  background: rgba(4, 8, 14, 0.24);
+  color: var(--text-primary);
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.account-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent-red);
+  box-shadow: 0 0 14px rgba(255, 74, 74, 0.4);
+}
+
+.account-status-dot.ready {
+  background: var(--accent-green);
+  box-shadow: 0 0 14px rgba(124, 245, 178, 0.35);
+}
+
+.google-signin-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+  min-height: 78px;
+}
+
+#google-signin-button {
+  min-height: 42px;
+}
+
+.account-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line-subtle);
+  border-radius: 8px;
+  background: rgba(4, 8, 14, 0.36);
+  color: var(--text-primary);
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  outline: none;
+}
+
+.account-input:focus {
+  border-color: rgba(103, 216, 255, 0.58);
+  box-shadow: 0 0 0 2px rgba(103, 216, 255, 0.1);
+}
+
+.account-full-button {
+  width: 100%;
+  height: 40px;
+}
+
+.account-muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.account-profile {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid var(--line-subtle);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(103, 216, 255, 0.09), rgba(124, 245, 178, 0.035)),
+    rgba(4, 8, 14, 0.24);
+}
+
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  overflow: hidden;
+  border: 1px solid rgba(246, 251, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(246, 251, 255, 0.08);
+  color: var(--text-primary);
+  font-family: "Space Mono", monospace;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.account-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-profile-main {
+  min-width: 0;
+}
+
+.account-profile-main span,
+.account-profile-main em {
+  display: block;
+  color: var(--text-muted);
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.account-profile-main b {
+  display: block;
+  margin: 2px 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: "Space Mono", monospace;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-records {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.account-records span {
+  min-height: 56px;
+  padding: 9px 6px;
+  border: 1px solid var(--line-subtle);
+  border-radius: 8px;
+  background: rgba(4, 8, 14, 0.25);
+  text-align: center;
+}
+
+.account-records b,
+.account-records em {
+  display: block;
+  overflow: hidden;
+  font-family: "Space Mono", monospace;
+  font-style: normal;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-records b {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.account-records em {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 8px;
+}
+
+.account-skill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.account-skill-line {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid rgba(103, 216, 255, 0.24);
+  border-color: color-mix(in srgb, var(--account-skill-color, var(--accent-blue)) 32%, transparent);
+  border-radius: 8px;
+  background: rgba(4, 8, 14, 0.24);
+}
+
+.account-skill-line b,
+.account-skill-line span {
+  overflow: hidden;
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-skill-line b {
+  color: var(--account-skill-color, var(--text-primary));
+}
+
+.account-skill-line span {
+  color: var(--text-secondary);
+}
+
+.account-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .toast-card {
