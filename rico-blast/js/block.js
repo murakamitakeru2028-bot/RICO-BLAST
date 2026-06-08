@@ -9,6 +9,7 @@ class Block {
     this.type = typeof blockType === "string" ? blockType : (blockType ? "burst" : "stone");
     this.definition = Block.types[this.type] || Block.types.stone;
     this.gridSpanRows = Math.max(1, this.definition.gridSpanRows || 1);
+    this.gridSpanCols = Math.max(1, this.definition.gridSpanCols || 1);
     this.maxHp = Math.max(1, Math.ceil(hp * this.definition.hpMultiplier));
     this.hp = this.maxHp;
     this.isSpecial = this.type !== "stone";
@@ -23,9 +24,13 @@ class Block {
     this.extraY = 0;
     this.diveRemaining = 0;
     this.diveMax = 0;
+    this.diveTrail = [];
     this.regenTimer = 0.5;
     this.spawnTimer = 10;
     this.hasSpawnedBlock = false;
+    this.armorFlashTimer = 0;
+    this.healFlashTimer = 0;
+    this.spawnFlashTimer = 0;
   }
 
   get displayX() {
@@ -56,42 +61,77 @@ class Block {
   update(game, dt) {
     this.age += dt;
     this.sway = 0;
+    this.updateTimers(dt);
     this.updateDive(game, dt);
-    this.updateRegen(dt);
+    this.updateRegen(game, dt);
     this.updateSpawner(game, dt);
     this.updatePoison(game, dt);
+  }
+
+  updateTimers(dt) {
+    this.armorFlashTimer = Math.max(0, this.armorFlashTimer - dt);
+    this.healFlashTimer = Math.max(0, this.healFlashTimer - dt);
+    this.spawnFlashTimer = Math.max(0, this.spawnFlashTimer - dt);
+    if (this.diveRemaining <= 0 && this.diveTrail.length > 0) this.diveTrail.pop();
   }
 
   updateDive(game, dt) {
     if (this.diveRemaining <= 0) return;
     const frame = dt * 60;
     const rowPitch = game && game.getBlockRowPitch ? game.getBlockRowPitch() : Math.max(1, this.height);
-    const amount = Math.min(this.diveRemaining, (this.descendSpeed || 0.09) * 3 * frame);
+    const divingForever = !Number.isFinite(this.diveRemaining);
+    const amount = divingForever
+      ? (this.descendSpeed || 0.09) * 3 * frame
+      : Math.min(this.diveRemaining, (this.descendSpeed || 0.09) * 3 * frame);
+    if (amount <= 0) return;
+
+    this.diveTrail.unshift({
+      x: this.displayX,
+      y: this.y,
+      width: this.width,
+      height: this.height
+    });
+    if (this.diveTrail.length > 2) this.diveTrail.pop();
+
     this.extraY += amount;
-    this.y += amount;
-    this.diveRemaining -= amount;
-    if (this.diveRemaining <= 0.001) {
+    if (!divingForever) this.diveRemaining -= amount;
+
+    while (this.extraY >= rowPitch) {
       this.gridRow += 1;
-      this.extraY = 0;
+      this.extraY -= rowPitch;
+    }
+
+    if (game && game.getBlockTopY) {
+      this.y = game.getBlockTopY(this.gridRow, this.gridSpanRows) + this.extraY;
+    } else {
+      this.y += amount;
+    }
+
+    if (!divingForever && this.diveRemaining <= 0.001) {
       this.diveRemaining = 0;
       this.diveMax = 0;
-      this.y = game && game.getBlockTopY ? game.getBlockTopY(this.gridRow, this.gridSpanRows) : this.y + rowPitch;
     }
   }
 
-  startDive(rowPitch) {
+  startDive(distance, rowPitch) {
     if (this.effect !== "dive" || this.diveRemaining > 0 || this.hp <= 0) return false;
-    this.diveRemaining = Math.max(1, rowPitch || this.height);
+    this.diveRemaining = Number.isFinite(distance)
+      ? Math.max(rowPitch || this.height || 1, distance || 0)
+      : Infinity;
     this.diveMax = this.diveRemaining;
+    this.diveTrail = [];
     return true;
   }
 
-  updateRegen(dt) {
+  updateRegen(game, dt) {
     if (this.effect !== "regen" || this.hp <= 0 || this.hp >= this.maxHp) return;
     this.regenTimer -= dt;
     if (this.regenTimer > 0) return;
     this.regenTimer += 0.5;
-    this.heal(this.maxHp * 0.02);
+    const healed = this.heal(this.maxHp * 0.02);
+    if (healed > 0 && game && typeof Effects !== "undefined" && Effects.spawnBlockRegen) {
+      Effects.spawnBlockRegen(this.cx, this.cy);
+    }
   }
 
   updateSpawner(game, dt) {
@@ -147,7 +187,9 @@ class Block {
     if (recovery <= 0 || this.hp <= 0) return 0;
     const before = this.hp;
     this.hp = Math.min(this.maxHp, this.hp + recovery);
-    return this.hp - before;
+    const healed = this.hp - before;
+    if (healed > 0) this.healFlashTimer = 0.2;
+    return healed;
   }
 
   isDestroyed() {
@@ -160,15 +202,26 @@ class Block {
   }
 
   draw(ctx) {
-    const x = this.displayX;
-    const y = this.y;
-    const w = this.width;
-    const h = this.height;
+    let x = this.displayX;
+    let y = this.y;
+    let w = this.width;
+    let h = this.height;
     const colors = this.colorSet;
     const ratio = clamp(this.hp / this.maxHp, 0, 1);
     const r = 3;
 
     ctx.save();
+    if (this.spawnFlashTimer > 0) {
+      const progress = 1 - clamp(this.spawnFlashTimer / 0.3, 0, 1);
+      const scale = clamp(progress, 0.05, 1);
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+      w *= scale;
+      h *= scale;
+      x = cx - w / 2;
+      y = cy - h / 2;
+    }
+
     this.drawSpecialAura(ctx, x, y, w, h, r);
     roundedRect(ctx, x, y, w, h, r);
     ctx.fillStyle = colors.empty;
@@ -186,9 +239,27 @@ class Block {
     }
     ctx.restore();
 
+    this.drawHpBar(ctx, x, y, w, h, ratio);
+
     if (this.effect === "dive" && this.diveRemaining > 0) {
-      ctx.globalAlpha = 0.18;
-      ctx.fillStyle = "rgba(246,251,255,0.9)";
+      ctx.globalAlpha = 0.055;
+      ctx.fillStyle = "rgba(246,251,255,0.75)";
+      roundedRect(ctx, x + 1, y + 1, w - 2, h - 2, r);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    if (this.armorFlashTimer > 0) {
+      ctx.globalAlpha = clamp(this.armorFlashTimer / 0.1, 0, 1) * 0.58;
+      ctx.fillStyle = "#ff4a4a";
+      roundedRect(ctx, x + 1, y + 1, w - 2, h - 2, r);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    if (this.healFlashTimer > 0) {
+      ctx.globalAlpha = clamp(this.healFlashTimer / 0.2, 0, 1) * 0.42;
+      ctx.fillStyle = "#4aff88";
       roundedRect(ctx, x + 1, y + 1, w - 2, h - 2, r);
       ctx.fill();
       ctx.globalAlpha = 1;
@@ -196,21 +267,36 @@ class Block {
 
     if (this.isSpecial) this.drawEffectMark(ctx, x, y, w, h);
 
-    const borderColor = this.definition.borderColor ||
-      Block.mixColor(colors.accent || colors.body, "#ffffff", this.type === "stone" ? 0.46 : 0.34);
+    const borderColor = this.effect === "dive" && this.diveRemaining > 0
+      ? "rgba(255,255,255,0.48)"
+      : (this.definition.borderColor ||
+        Block.mixColor(colors.accent || colors.body, "#ffffff", this.type === "stone" ? 0.46 : 0.34));
     const borderWidth = this.definition.borderWidth || 2;
 
-    ctx.globalAlpha = 0.68;
+    ctx.globalAlpha = 0.42;
     ctx.strokeStyle = "rgba(0,0,0,0.72)";
-    ctx.lineWidth = borderWidth + 1.1;
+    ctx.lineWidth = borderWidth + 0.8;
     roundedRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, r);
     ctx.stroke();
 
     ctx.strokeStyle = borderColor;
-    ctx.globalAlpha = 0.98;
+    ctx.globalAlpha = 0.92;
     ctx.lineWidth = borderWidth;
     roundedRect(ctx, x + 0.6, y + 0.6, w - 1.2, h - 1.2, r);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  drawHpBar(ctx, x, y, w, h, ratio) {
+    const barHeight = this.definition.hpBarHeight || 0;
+    if (barHeight <= 0) return;
+    const barY = y + h - barHeight;
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = "rgba(6,8,16,0.62)";
+    ctx.fillRect(x + 2, barY - 1, w - 4, barHeight);
+    ctx.fillStyle = this.definition.hpBarColor || this.definition.borderColor || "#f6fbff";
+    ctx.fillRect(x + 2, barY - 1, Math.max(1, (w - 4) * ratio), barHeight);
     ctx.restore();
   }
 
@@ -219,10 +305,10 @@ class Block {
     if (this.effect === "regen") {
       ctx.save();
       ctx.globalAlpha = 0.4 + pulse * 0.6;
-      ctx.shadowBlur = 14;
-      ctx.shadowColor = "rgba(124,245,178,0.72)";
-      ctx.strokeStyle = "rgba(124,245,178,0.55)";
-      ctx.lineWidth = 2;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = "#4aff88";
+      ctx.strokeStyle = "rgba(74,255,136,0.42)";
+      ctx.lineWidth = 1;
       roundedRect(ctx, x - 2, y - 2, w + 4, h + 4, r + 2);
       ctx.stroke();
       ctx.restore();
@@ -231,11 +317,11 @@ class Block {
 
     if (this.effect === "healBurst") {
       ctx.save();
-      ctx.globalAlpha = 0.45 + pulse * 0.22;
-      ctx.shadowBlur = 18;
-      ctx.shadowColor = "rgba(255,136,68,0.72)";
-      ctx.strokeStyle = "rgba(255,136,68,0.48)";
-      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.62;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "#ff8844";
+      ctx.strokeStyle = "rgba(255,136,68,0.38)";
+      ctx.lineWidth = 1;
       roundedRect(ctx, x - 2, y - 2, w + 4, h + 4, r + 2);
       ctx.stroke();
       ctx.restore();
@@ -244,10 +330,12 @@ class Block {
 
     if (this.effect === "spawner") {
       ctx.save();
-      const spread = 5 + pulse * 8;
+      const spread = 4 + pulse * 10;
       ctx.globalAlpha = 0.22 + pulse * 0.18;
-      ctx.strokeStyle = "rgba(170,102,255,0.68)";
-      ctx.lineWidth = 2;
+      ctx.shadowBlur = 6 + pulse * 8;
+      ctx.shadowColor = "#aa66ff";
+      ctx.strokeStyle = "rgba(170,102,255,0.46)";
+      ctx.lineWidth = 1;
       roundedRect(ctx, x - spread, y - spread, w + spread * 2, h + spread * 2, r + spread);
       ctx.stroke();
       ctx.restore();
@@ -256,11 +344,13 @@ class Block {
 
     if (this.effect === "dive" && this.diveRemaining > 0) {
       ctx.save();
-      ctx.globalAlpha = 0.18;
-      ctx.fillStyle = "rgba(246,251,255,0.72)";
-      for (let i = 1; i <= 3; i += 1) {
-        roundedRect(ctx, x + 2, y - i * 7, w - 4, h, r);
-        ctx.fill();
+      ctx.strokeStyle = "rgba(246,251,255,0.38)";
+      ctx.lineWidth = 1;
+      for (let i = this.diveTrail.length - 1; i >= 0; i -= 1) {
+        const trail = this.diveTrail[i];
+        ctx.globalAlpha = 0.085 * (1 - i * 0.34);
+        roundedRect(ctx, trail.x + 6, trail.y + 3, trail.width - 12, trail.height - 6, r);
+        ctx.stroke();
       }
       ctx.restore();
     }
@@ -269,19 +359,22 @@ class Block {
   drawEffectMark(ctx, x, y, w, h) {
     const cx = x + w * 0.5;
     const cy = y + h * 0.5;
-    const icon = Math.min(8, h * 0.32);
+    const icon = Math.min(10, h * 0.34);
     ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,0.7)";
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.strokeStyle = "rgba(255,255,255,0.6)";
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
     if (this.effect === "heavy") {
-      ctx.fillStyle = "rgba(246,251,255,0.82)";
-      ctx.fillRect(cx - icon * 0.48, cy - icon * 1.4, 3, icon * 2.8);
-      ctx.fillRect(cx + icon * 0.18, cy - icon * 1.4, 3, icon * 2.8);
+      const barWidth = clamp(Math.min(w, h) * 0.12, 3, 7);
+      const barHeight = Math.min(h * 0.56, 44);
+      ctx.fillStyle = "rgba(255,255,255,0.58)";
+      ctx.fillRect(cx - barWidth * 1.35, cy - barHeight / 2, barWidth, barHeight);
+      ctx.fillRect(cx + barWidth * 0.35, cy - barHeight / 2, barWidth, barHeight);
     } else if (this.effect === "armor") {
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
       ctx.beginPath();
       ctx.moveTo(cx, cy - icon * 1.05);
       ctx.lineTo(cx + icon * 0.95, cy + icon * 0.75);
@@ -289,21 +382,34 @@ class Block {
       ctx.closePath();
       ctx.stroke();
     } else if (this.effect === "dive") {
-      ctx.globalAlpha = this.diveRemaining > 0 ? 0.95 : 0.42;
+      ctx.globalAlpha = this.diveRemaining > 0 ? 0.62 : 0.36;
       ctx.beginPath();
       ctx.moveTo(cx, y + h - icon * 0.45);
       ctx.lineTo(cx + icon * 0.75, y + h - icon * 1.3);
       ctx.lineTo(cx - icon * 0.75, y + h - icon * 1.3);
       ctx.closePath();
       ctx.fill();
+    } else if (this.effect === "regen") {
+      ctx.strokeStyle = "#4aff88";
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(cx - icon * 0.65, cy);
+      ctx.lineTo(cx + icon * 0.65, cy);
+      ctx.moveTo(cx, cy - icon * 0.65);
+      ctx.lineTo(cx, cy + icon * 0.65);
+      ctx.stroke();
     } else if (this.effect === "healBurst") {
+      ctx.fillStyle = "#ff8844";
       ctx.font = `900 ${Math.max(12, Math.min(18, h * 0.52))}px 'Space Mono', monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("!", cx, cy + 0.5);
     } else if (this.effect === "spawner") {
       const seconds = Math.max(0, Math.ceil(this.spawnTimer));
-      ctx.font = `800 ${Math.max(8, Math.min(12, h * 0.38))}px 'Space Mono', monospace`;
+      const urgent = !this.hasSpawnedBlock && seconds <= 3;
+      if (urgent) ctx.globalAlpha = 0.35 + Math.sin(this.age * Math.PI * 8) * 0.25 + 0.4;
+      ctx.fillStyle = urgent ? "#ff4a4a" : "#aa66ff";
+      ctx.font = `800 ${Math.max(9, Math.min(11, h * 0.36))}px 'Space Mono', monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(this.hasSpawnedBlock ? "+" : String(seconds), cx, cy);
@@ -379,16 +485,51 @@ Block.types = {
       accent: "#2a2a3e"
     }
   },
-  heavy: {
+  heavyS: {
     effect: "heavy",
-    hpMultiplier: 5,
+    hpMultiplier: 4,
+    tokenMultiplier: 1,
+    gridSpanRows: 2,
+    gridSpanCols: 1,
+    borderWidth: 4,
+    borderColor: "rgba(255,255,255,0.4)",
+    hpBarHeight: 3,
+    hpBarColor: "rgba(255,255,255,0.55)",
+    colors: {
+      body: "#2a2a3e",
+      empty: "#151523",
+      accent: "#f6fbff"
+    }
+  },
+  heavyM: {
+    effect: "heavy",
+    hpMultiplier: 9,
     tokenMultiplier: 1,
     gridSpanRows: 3,
+    gridSpanCols: 1,
     borderWidth: 4,
-    borderColor: "rgba(246,251,255,0.92)",
+    borderColor: "rgba(255,255,255,0.4)",
+    hpBarHeight: 3,
+    hpBarColor: "rgba(255,255,255,0.55)",
     colors: {
-      body: "#4b4f62",
-      empty: "#171923",
+      body: "#2a2a3e",
+      empty: "#151523",
+      accent: "#f6fbff"
+    }
+  },
+  heavyL: {
+    effect: "heavy",
+    hpMultiplier: 16,
+    tokenMultiplier: 1,
+    gridSpanRows: 2,
+    gridSpanCols: 2,
+    borderWidth: 4,
+    borderColor: "rgba(255,255,255,0.4)",
+    hpBarHeight: 3,
+    hpBarColor: "rgba(255,255,255,0.55)",
+    colors: {
+      body: "#2a2a3e",
+      empty: "#151523",
       accent: "#f6fbff"
     }
   },
@@ -396,11 +537,11 @@ Block.types = {
     effect: "armor",
     hpMultiplier: 1,
     tokenMultiplier: 1,
-    borderWidth: 3,
-    borderColor: "rgba(246,251,255,0.9)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.35)",
     colors: {
-      body: "#33394d",
-      empty: "#151824",
+      body: "#1e2a3a",
+      empty: "#101722",
       accent: "#f6fbff"
     }
   },
@@ -408,11 +549,11 @@ Block.types = {
     effect: "dive",
     hpMultiplier: 1,
     tokenMultiplier: 1,
-    borderWidth: 3,
-    borderColor: "rgba(246,251,255,0.82)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.3)",
     colors: {
-      body: "#394057",
-      empty: "#151824",
+      body: "#2a2a3e",
+      empty: "#151523",
       accent: "#f6fbff"
     }
   },
@@ -420,11 +561,11 @@ Block.types = {
     effect: "regen",
     hpMultiplier: 1,
     tokenMultiplier: 1,
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: "#ff4a4a",
     colors: {
-      body: "#44303c",
-      empty: "#21151d",
+      body: "#1a2a1a",
+      empty: "#0f1a10",
       accent: "#7cf5b2"
     }
   },
@@ -432,11 +573,11 @@ Block.types = {
     effect: "healBurst",
     hpMultiplier: 1,
     tokenMultiplier: 1,
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: "#ff4a4a",
     colors: {
-      body: "#5a2f2a",
-      empty: "#261513",
+      body: "#2a1a0a",
+      empty: "#171008",
       accent: "#ff8844"
     }
   },
@@ -444,11 +585,11 @@ Block.types = {
     effect: "spawner",
     hpMultiplier: 1,
     tokenMultiplier: 1,
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: "#ff4a4a",
     colors: {
-      body: "#3b2a56",
-      empty: "#1b1428",
+      body: "#1a0a2a",
+      empty: "#100719",
       accent: "#aa66ff"
     }
   },
@@ -514,5 +655,6 @@ Block.types = {
   }
 };
 
-Block.specialTypes = ["heavy", "armor", "dive", "regen", "exploder", "spawner"];
+Block.specialTypes = ["heavyS", "heavyM", "heavyL", "armor", "dive", "regen", "exploder", "spawner"];
+Block.heavyTypes = ["heavyS", "heavyM", "heavyL"];
 Block.coloredTypes = ["row", "chain", "tokens", "burst", "column", "aqua"];

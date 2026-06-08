@@ -155,6 +155,99 @@ const Effects = {
     this.trimEffects();
   },
 
+  showArmorDeflect(x, y) {
+    this.rings.push({
+      x,
+      y,
+      color: "#ff4a4a",
+      radius: 2,
+      maxRadius: 16,
+      lineWidth: 1.6,
+      life: 0.1,
+      maxLife: 0.1
+    });
+    for (let i = 0; i < 6; i += 1) {
+      const angle = rand(Math.PI * 0.85, Math.PI * 2.15);
+      const speed = rand(2.2, 5.8);
+      this.particles.push({
+        x: x + rand(-5, 5),
+        y: y + rand(-5, 5),
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: rand(3, 6),
+        rotation: angle,
+        spin: rand(-0.28, 0.28),
+        shape: "spark",
+        color: "#ff4a4a",
+        glow: true,
+        blend: true,
+        drag: 0.82,
+        gravity: 0.02,
+        life: 0.14,
+        maxLife: 0.14
+      });
+    }
+    this.trimEffects();
+  },
+
+  spawnBlockRegen(x, y) {
+    for (let i = 0; i < 5; i += 1) {
+      this.particles.push({
+        x: x + rand(-11, 11),
+        y: y + rand(-4, 5),
+        vx: rand(-0.7, 0.7),
+        vy: rand(-1.8, -0.7),
+        size: rand(1.8, 3.4),
+        rotation: rand(0, Math.PI * 2),
+        spin: rand(-0.18, 0.18),
+        shape: "diamond",
+        color: "#4aff88",
+        glow: true,
+        blend: true,
+        drag: 0.88,
+        gravity: -0.01,
+        life: rand(0.26, 0.4),
+        maxLife: 0.4
+      });
+    }
+    this.trimEffects();
+  },
+
+  spawnBlockSpawn(x, y) {
+    this.rings.push({
+      x,
+      y,
+      color: "#aa66ff",
+      radius: 0,
+      maxRadius: 24,
+      lineWidth: 1.4,
+      life: 0.3,
+      maxLife: 0.3
+    });
+    for (let i = 0; i < 10; i += 1) {
+      const angle = rand(0, Math.PI * 2);
+      const speed = rand(1.4, 4.8);
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: rand(2, 4.2),
+        rotation: angle,
+        spin: rand(-0.22, 0.22),
+        shape: Math.random() < 0.65 ? "diamond" : "square",
+        color: "#aa66ff",
+        glow: true,
+        blend: true,
+        drag: 0.86,
+        gravity: 0.02,
+        life: rand(0.24, 0.38),
+        maxLife: 0.38
+      });
+    }
+    this.trimEffects();
+  },
+
   spawnTokenCollect(x, y, amount = 1) {
     this.showTokenCollect(x, y, amount);
   },

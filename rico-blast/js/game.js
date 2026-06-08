@@ -323,8 +323,9 @@ const Game = {
     const layout = this.getBlockLayout();
     const startRow = -1;
     const rows = 5;
-    for (let row = startRow; row < startRow + rows; row += 1) {
-      this.spawnBlockRow(row, layout);
+    const endRow = startRow + rows - 1;
+    for (let row = endRow; row >= startRow; row -= 1) {
+      this.spawnBlockRow(row, layout, { minRow: startRow, maxRow: endRow });
     }
   },
 
@@ -366,6 +367,11 @@ const Game = {
     return layout.blockHeight + (span - 1) * this.getBlockRowPitch(layout);
   },
 
+  getBlockWidthForSpan(spanCols = 1, layout = this.getBlockLayout()) {
+    const span = Math.max(1, Math.floor(spanCols || 1));
+    return layout.blockWidth * span + layout.gap * (span - 1);
+  },
+
   getBlockTopY(rowIndex, spanRows = 1, layout = this.getBlockLayout()) {
     return this.getBlockY(rowIndex, layout) - (Math.max(1, spanRows || 1) - 1) * this.getBlockRowPitch(layout);
   },
@@ -379,32 +385,121 @@ const Game = {
     };
   },
 
-  isBlockCellOccupied(rowIndex, col, exceptBlock = null) {
+  getBlockOccupiedCols(block) {
+    const span = Math.max(1, block.gridSpanCols || 1);
+    const startCol = Number.isFinite(block.gridCol) ? block.gridCol : 0;
+    return {
+      start: startCol,
+      end: startCol + span - 1
+    };
+  },
+
+  getBlockCellKey(rowIndex, col) {
+    return rowIndex * 16 + col;
+  },
+
+  buildBlockOccupancy(exceptBlock = null) {
+    const occupancy = {
+      occupied: new Set(),
+      heavyAdjacent: new Set()
+    };
+    for (const block of this.blocks) {
+      if (block === exceptBlock) continue;
+      this.markBlockInOccupancy(block, occupancy);
+    }
+    return occupancy;
+  },
+
+  markBlockInOccupancy(block, occupancy) {
+    if (!block || !occupancy) return;
+    const rows = this.getBlockOccupiedRows(block);
+    const cols = this.getBlockOccupiedCols(block);
+    for (let row = rows.start; row <= rows.end; row += 1) {
+      for (let col = cols.start; col <= cols.end; col += 1) {
+        occupancy.occupied.add(this.getBlockCellKey(row, col));
+      }
+    }
+    if (block.effect !== "heavy") return;
+    for (let row = rows.start - 1; row <= rows.end + 1; row += 1) {
+      for (let col = cols.start - 1; col <= cols.end + 1; col += 1) {
+        occupancy.heavyAdjacent.add(this.getBlockCellKey(row, col));
+      }
+    }
+  },
+
+  isBlockCellOccupied(rowIndex, col, exceptBlock = null, occupancy = null) {
+    if (occupancy && !exceptBlock) return occupancy.occupied.has(this.getBlockCellKey(rowIndex, col));
     return this.blocks.some((block) => {
-      if (block === exceptBlock || block.gridCol !== col) return false;
+      if (block === exceptBlock) return false;
       const rows = this.getBlockOccupiedRows(block);
-      return rowIndex >= rows.start && rowIndex <= rows.end;
+      const cols = this.getBlockOccupiedCols(block);
+      return rowIndex >= rows.start && rowIndex <= rows.end && col >= cols.start && col <= cols.end;
     });
   },
 
-  canPlaceBlockAt(rowIndex, col, type = "stone") {
+  canPlaceBlockAt(rowIndex, col, type = "stone", layout = this.getBlockLayout(), bounds = {}, occupancy = null) {
     const definition = Block.types[type] || Block.types.stone;
     const span = Math.max(1, definition.gridSpanRows || 1);
-    for (let row = rowIndex - span + 1; row <= rowIndex; row += 1) {
-      if (this.isBlockCellOccupied(row, col)) return false;
+    const spanCols = Math.max(1, definition.gridSpanCols || 1);
+    const startRow = rowIndex - span + 1;
+    if (Number.isFinite(bounds.minRow) && startRow < bounds.minRow) return false;
+    if (Number.isFinite(bounds.maxRow) && rowIndex > bounds.maxRow) return false;
+    if (col < 0 || col + spanCols > layout.cols) return false;
+    for (let row = startRow; row <= rowIndex; row += 1) {
+      for (let checkCol = col; checkCol < col + spanCols; checkCol += 1) {
+        if (this.isBlockCellOccupied(row, checkCol, null, occupancy)) return false;
+      }
     }
+    if (this.isHeavyBlockType(type) && this.hasAdjacentHeavyBlock(rowIndex, col, type, occupancy)) return false;
     return true;
   },
 
-  spawnBlockRow(rowIndex, layout = this.getBlockLayout()) {
+  isHeavyBlockType(type) {
+    const definition = Block.types[type] || null;
+    return !!definition && definition.effect === "heavy";
+  },
+
+  hasAdjacentHeavyBlock(rowIndex, col, type = "heavyS", occupancy = null) {
+    const definition = Block.types[type] || Block.types.heavyS;
+    const spanRows = Math.max(1, definition.gridSpanRows || 1);
+    const spanCols = Math.max(1, definition.gridSpanCols || 1);
+    const rows = {
+      start: rowIndex - spanRows + 1,
+      end: rowIndex
+    };
+    const cols = {
+      start: col,
+      end: col + spanCols - 1
+    };
+    if (occupancy) {
+      for (let row = rows.start; row <= rows.end; row += 1) {
+        for (let checkCol = cols.start; checkCol <= cols.end; checkCol += 1) {
+          if (occupancy.heavyAdjacent.has(this.getBlockCellKey(row, checkCol))) return true;
+        }
+      }
+      return false;
+    }
+    return this.blocks.some((block) => {
+      if (block.effect !== "heavy") return false;
+      const otherRows = this.getBlockOccupiedRows(block);
+      const otherCols = this.getBlockOccupiedCols(block);
+      return otherRows.end >= rows.start - 1 &&
+        otherRows.start <= rows.end + 1 &&
+        otherCols.end >= cols.start - 1 &&
+        otherCols.start <= cols.end + 1;
+    });
+  },
+
+  spawnBlockRow(rowIndex, layout = this.getBlockLayout(), bounds = {}) {
     const hp = this.getBaseBlockHp(this.difficultyLevel);
     const speed = this.getBlockDescendSpeed();
+    const occupancy = this.buildBlockOccupancy();
     for (let col = 0; col < layout.cols; col += 1) {
-      if (this.isBlockCellOccupied(rowIndex, col)) continue;
+      if (this.isBlockCellOccupied(rowIndex, col, null, occupancy)) continue;
       const x = layout.padding + col * (layout.blockWidth + layout.gap);
-      let type = this.pickBlockType(rowIndex, col);
-      if (!this.canPlaceBlockAt(rowIndex, col, type)) type = "stone";
-      this.createBlockAt(rowIndex, col, type, hp, layout, speed, x);
+      const type = this.pickPlaceableBlockType(rowIndex, col, layout, bounds, occupancy);
+      const block = this.createBlockAt(rowIndex, col, type, hp, layout, speed, x);
+      this.markBlockInOccupancy(block, occupancy);
     }
     this.blockRowsSpawned += 1;
   },
@@ -412,13 +507,17 @@ const Game = {
   createBlockAt(rowIndex, col, type = "stone", hp = this.getBaseBlockHp(this.difficultyLevel), layout = this.getBlockLayout(), speed = this.getBlockDescendSpeed(), x = null) {
     const definition = Block.types[type] || Block.types.stone;
     const span = Math.max(1, definition.gridSpanRows || 1);
+    const spanCols = Math.max(1, definition.gridSpanCols || 1);
+    const pitch = this.getBlockRowPitch(layout);
     const blockX = Number.isFinite(x) ? x : layout.padding + col * (layout.blockWidth + layout.gap);
-    const blockY = this.getBlockTopY(rowIndex, span, layout);
-    const blockHeight = this.getBlockHeightForSpan(span, layout);
-    const block = new Block(blockX, blockY, hp, type, layout.blockWidth, blockHeight, speed);
+    const blockY = this.getBlockStartY() + rowIndex * pitch + this.blockGridOffset - (span - 1) * pitch;
+    const blockHeight = layout.blockHeight + (span - 1) * pitch;
+    const blockWidth = layout.blockWidth * spanCols + layout.gap * (spanCols - 1);
+    const block = new Block(blockX, blockY, hp, type, blockWidth, blockHeight, speed);
     block.gridRow = rowIndex;
     block.gridCol = col;
     block.gridSpanRows = span;
+    block.gridSpanCols = spanCols;
     this.blocks.push(block);
     return block;
   },
@@ -426,36 +525,63 @@ const Game = {
   spawnNormalBlockNear(sourceBlock) {
     if (!sourceBlock) return false;
     const layout = this.getBlockLayout();
-    const options = [
-      { row: sourceBlock.gridRow, col: sourceBlock.gridCol - 1 },
-      { row: sourceBlock.gridRow, col: sourceBlock.gridCol + 1 },
-      { row: sourceBlock.gridRow - 1, col: sourceBlock.gridCol },
-      { row: sourceBlock.gridRow + 1, col: sourceBlock.gridCol }
-    ].filter((cell) => cell.col >= 0 && cell.col < layout.cols && this.canPlaceBlockAt(cell.row, cell.col, "stone"));
-    if (options.length === 0) return false;
-    const cell = options[randomInt(0, options.length - 1)];
+    const occupancy = this.buildBlockOccupancy();
+    const rows = this.getBlockOccupiedRows(sourceBlock);
+    const cols = this.getBlockOccupiedCols(sourceBlock);
+    const options = [];
+    for (let row = rows.end; row >= rows.start; row -= 1) {
+      options.push({ row, col: cols.start - 1 });
+      options.push({ row, col: cols.end + 1 });
+    }
+    for (let col = cols.start; col <= cols.end; col += 1) {
+      options.push({ row: rows.start - 1, col });
+      options.push({ row: rows.end + 1, col });
+    }
+    const openOptions = options.filter((cell) =>
+      cell.col >= 0 && cell.col < layout.cols && this.canPlaceBlockAt(cell.row, cell.col, "stone", layout, {}, occupancy)
+    );
+    if (openOptions.length === 0) return false;
+    const cell = openOptions[0];
     const block = this.createBlockAt(cell.row, cell.col, "stone", this.getBaseBlockHp(this.difficultyLevel), layout);
-    Effects.spawnImpactSpark(block.cx, block.cy, "#aa66ff");
-    Effects.showPopup("SPAWN", block.cx, block.cy - 12, "#aa66ff");
+    block.spawnFlashTimer = 0.3;
+    if (Effects.spawnBlockSpawn) Effects.spawnBlockSpawn(block.cx, block.cy);
+    else Effects.spawnImpactSpark(block.cx, block.cy, "#aa66ff");
     return true;
   },
 
   syncBlockGridPositions() {
     const layout = this.getBlockLayout();
+    const pitch = this.getBlockRowPitch(layout);
+    const baseY = this.getBlockStartY() + this.blockGridOffset;
     for (const block of this.blocks) {
       const col = Number.isFinite(block.gridCol) ? block.gridCol : 0;
       const row = Number.isFinite(block.gridRow) ? block.gridRow : 0;
       const span = Math.max(1, block.gridSpanRows || 1);
-      block.width = layout.blockWidth;
-      block.height = this.getBlockHeightForSpan(span, layout);
+      const spanCols = Math.max(1, block.gridSpanCols || 1);
+      block.width = layout.blockWidth * spanCols + layout.gap * (spanCols - 1);
+      block.height = layout.blockHeight + (span - 1) * pitch;
       block.x = layout.padding + col * (layout.blockWidth + layout.gap);
-      block.y = this.getBlockTopY(row, span, layout) + (block.extraY || 0);
+      block.y = baseY + row * pitch - (span - 1) * pitch + (block.extraY || 0);
     }
   },
 
+  pickPlaceableBlockType(rowIndex, col, layout = this.getBlockLayout(), bounds = {}, occupancy = null) {
+    const options = this.getBlockTypeWeights();
+    while (options.length > 0) {
+      const type = this.pickWeightedBlockType(options);
+      const index = options.findIndex(([candidate]) => candidate === type);
+      if (index >= 0) options.splice(index, 1);
+      if (type === "stone") return this.pickNormalBlockType();
+      if (this.canPlaceBlockAt(rowIndex, col, type, layout, bounds, occupancy)) return type;
+    }
+    return this.pickNormalBlockType();
+  },
+
   pickBlockType(rowIndex, col) {
-    const specialRate = this.getSpecialBlockRate();
-    if (Math.random() < specialRate) return this.pickNewSpecialBlockType();
+    return this.pickPlaceableBlockType(rowIndex, col);
+  },
+
+  pickNormalBlockType() {
     if (Math.random() < 0.12) {
       const types = Block.coloredTypes || ["row", "chain", "tokens", "burst", "column", "aqua"];
       return types[randomInt(0, types.length - 1)];
@@ -464,25 +590,83 @@ const Game = {
   },
 
   getSpecialBlockRate() {
-    return clamp(0.15 + Math.max(0, this.difficultyLevel - 1) * 0.005, 0.15, 0.20);
+    const weights = this.getBlockTypeWeights();
+    const total = weights.reduce((sum, [, weight]) => sum + weight, 0);
+    const normal = weights.find(([type]) => type === "stone");
+    return total > 0 ? clamp(1 - ((normal ? normal[1] : 0) / total), 0, 1) : 0;
   },
 
   pickNewSpecialBlockType() {
-    const weighted = [
-      ["dive", 13],
-      ["heavy", 1.4],
-      ["armor", 1.4],
-      ["regen", 1.4],
-      ["exploder", 1.4],
-      ["spawner", 1.4]
-    ];
-    const total = weighted.reduce((sum, [, weight]) => sum + weight, 0);
+    const weighted = this.getBlockTypeWeights().filter(([type]) => type !== "stone");
+    return this.pickWeightedBlockType(weighted) || "heavyS";
+  },
+
+  pickWeightedBlockType(weighted) {
+    const total = weighted.reduce((sum, [, weight]) => sum + Math.max(0, weight), 0);
+    if (total <= 0) return "stone";
     let roll = Math.random() * total;
     for (const [type, weight] of weighted) {
-      roll -= weight;
+      roll -= Math.max(0, weight);
       if (roll <= 0) return type;
     }
-    return "dive";
+    return weighted[0] ? weighted[0][0] : "stone";
+  },
+
+  getBlockTypeWeights() {
+    const wave = Math.max(1, this.difficultyLevel || 1);
+    let weights;
+    if (wave < 5) {
+      weights = [
+        ["stone", 85],
+        ["heavyS", 15]
+      ];
+    } else if (wave < 10) {
+      weights = [
+        ["stone", 72],
+        ["heavyS", 12],
+        ["armor", 8],
+        ["dive", 8]
+      ];
+    } else if (wave < 15) {
+      weights = [
+        ["stone", 60],
+        ["heavyS", 10],
+        ["heavyM", 10],
+        ["armor", 8],
+        ["dive", 10],
+        ["regen", 2]
+      ];
+    } else if (wave < 20) {
+      weights = [
+        ["stone", 50],
+        ["heavyS", 8],
+        ["heavyM", 8],
+        ["armor", 8],
+        ["dive", 12],
+        ["regen", 5],
+        ["exploder", 5],
+        ["spawner", 4]
+      ];
+    } else {
+      weights = [
+        ["stone", 40],
+        ["heavyS", 6],
+        ["heavyM", 8],
+        ["heavyL", 6],
+        ["armor", 8],
+        ["dive", 12],
+        ["regen", 8],
+        ["exploder", 6],
+        ["spawner", 6]
+      ];
+      const diveBonus = clamp((wave - 20) * 0.8, 0, 8);
+      weights = weights.map(([type, weight]) => {
+        if (type === "stone") return [type, Math.max(0, weight - diveBonus)];
+        if (type === "dive") return [type, weight + diveBonus];
+        return [type, weight];
+      });
+    }
+    return weights.map(([type, weight]) => [type, Math.max(0, weight)]);
   },
 
   pickColoredBlockType() {
@@ -600,7 +784,11 @@ const Game = {
 
   getTopmostBlockRow() {
     if (this.blocks.length === 0) return null;
-    return this.blocks.reduce((top, block) => Math.min(top, this.getBlockOccupiedRows(block).start), Infinity);
+    return this.blocks.reduce((top, block) => {
+      const row = Number.isFinite(block.gridRow) ? block.gridRow : 0;
+      const span = Math.max(1, block.gridSpanRows || 1);
+      return Math.min(top, row - span + 1);
+    }, Infinity);
   },
 
   getMaxActiveBlocks() {
@@ -703,7 +891,10 @@ const Game = {
     this.drawBackground(ctx);
     this.drawZones(ctx);
     TokenManager.draw(ctx);
-    for (const block of this.blocks) block.draw(ctx);
+    for (const block of this.blocks) {
+      if (block.y + block.height < -48 || block.y > this.height + 48) continue;
+      block.draw(ctx);
+    }
     this.drawProjectiles(ctx);
     this.paddle.draw(ctx);
     this.drawResumeShield(ctx);
@@ -805,14 +996,21 @@ const Game = {
   getBlockDamageAmount(block, amount, source = "hit", options = {}) {
     let damage = Math.max(0, Number(amount) || 0);
     if (block && block.effect === "armor") {
-      const topHit = source === "ball" && options.collision && options.collision.normalY < 0;
-      if (!topHit) damage *= 0.3;
+      if (!this.isArmorTopHit(source, options)) damage *= 0.3;
     }
     return damage;
   },
 
+  isArmorTopHit(source = "hit", options = {}) {
+    return source === "ball" && options.collision && options.collision.normalY < 0;
+  },
+
   damageBlock(block, amount, sourceBall, source = "hit", depth = 0, options = {}) {
     if (!this.blocks.includes(block) || block.hp <= 0) return false;
+    if (block.effect === "armor" && !this.isArmorTopHit(source, options)) {
+      block.armorFlashTimer = 0.1;
+      if (Effects.showArmorDeflect) Effects.showArmorDeflect(block.cx, block.cy);
+    }
     const appliedDamage = this.getBlockDamageAmount(block, amount, source, options);
     const displayedDamage = Math.max(0, appliedDamage);
     if (displayedDamage > 0) {
@@ -896,13 +1094,16 @@ const Game = {
   triggerDiveBlocksAbove(destroyedBlock) {
     if (!destroyedBlock) return;
     const destroyedRows = this.getBlockOccupiedRows(destroyedBlock);
+    const destroyedCols = this.getBlockOccupiedCols(destroyedBlock);
     const rowPitch = this.getBlockRowPitch();
     for (const block of this.blocks) {
-      if (block.effect !== "dive" || block.gridCol !== destroyedBlock.gridCol) continue;
+      if (block.effect !== "dive") continue;
       const rows = this.getBlockOccupiedRows(block);
+      const cols = this.getBlockOccupiedCols(block);
+      const overlapsColumn = cols.start <= destroyedCols.end && cols.end >= destroyedCols.start;
+      if (!overlapsColumn) continue;
       if (rows.end !== destroyedRows.start - 1) continue;
-      if (block.startDive(rowPitch)) {
-        Effects.showPopup("DIVE", block.cx, block.cy, "#f6fbff");
+      if (block.startDive(Infinity, rowPitch)) {
         Effects.spawnImpactSpark(block.cx, block.cy, "#f6fbff");
       }
     }
@@ -995,15 +1196,15 @@ const Game = {
         x: block.cx,
         y: block.cy,
         radius: 100,
-        life: 0.45,
-        maxLife: 0.45,
+        life: 0.4,
+        maxLife: 0.4,
         color: "#7cf5b2",
         sourceBall
       });
       for (const target of this.blocks) {
         if (distance(block.cx, block.cy, target.cx, target.cy) > 100) continue;
-        target.heal(target.maxHp * 0.3);
-        Effects.showPopup("HEAL", target.cx, target.cy - 10, "#7cf5b2");
+        const healed = target.heal(target.maxHp * 0.3);
+        if (healed > 0 && Effects.spawnBlockRegen) Effects.spawnBlockRegen(target.cx, target.cy);
       }
       return;
     }
