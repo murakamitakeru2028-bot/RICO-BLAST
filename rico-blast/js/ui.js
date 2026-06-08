@@ -12,7 +12,7 @@ const SLOT_SKILL_LABELS = {
   overload: "OVERLOAD",
   fragment: "FRAG",
   detonator: "DETONATE",
-  shatter: "SHATTER",
+  shatter: "粉砕",
   poison: "POISON",
   afterburn: "BURN",
   lightning: "LIGHTNING",
@@ -54,6 +54,7 @@ const SKILL_DETAIL_TEXT = {
   overload: "同じブロックに連続ヒットするほど火力上昇。高HPブロックを一点突破しやすい。",
   fragment: "破壊時に複数の欠片弾を飛ばす。★が高いほど欠片の数とダメージが増える。",
   detonator: "3ヒットごとに小さな爆発を起こす。連続ヒットや貫通と合わせると発動しやすい。",
+  shatter: "破壊したブロック周辺の低HPブロックへ追撃ダメージ。★が高いほど判定HPと範囲が広がる。",
   poison: "壊しきれなかったブロックに毒を付与する。★が高いほど継続ダメージが強く長くなる。",
   afterburn: "破壊位置に炎のダメージゾーンを残す。通過弾の追撃と合わせて周囲を削る。",
   lightning: "破壊時に近くのブロックへ電撃が飛ぶ。★が高いほど連鎖数と届く範囲が伸びる。",
@@ -524,8 +525,8 @@ const UI = {
       return `${Number.isInteger(value) ? value : Number(value).toFixed(1).replace(/\.0$/, "")}${suffix}`;
     };
     const v = (key, fallback = 0) => skillParam(id, level, key, fallback);
-    if (id === "expert") return `AVG1 ${n(v("avgLv1"))}x / AVG3 ${n(v("avgLv3"))}x / AVG5 ${n(v("avgLv5"))}x`;
-    if (id === "shatter") return `HP<=${p(v("threshold"))} / R${v("radius")} / HP${p(v("damage"))}`;
+    if (id === "expert") return `平均Lv1 ${n(v("avgLv1"))}倍 / 平均Lv3 ${n(v("avgLv3"))}倍 / 平均Lv5 ${n(v("avgLv5"))}倍`;
+    if (id === "shatter") return `HP${p(v("threshold"))}以下 / 半径${v("radius")} / HP${p(v("damage"))}`;
     switch (id) {
       case "penetration": return `${level}枚まで貫通`;
       case "splash": return `半径${v("radius")} / HP${p(v("damage"))}`;
@@ -546,7 +547,7 @@ const UI = {
       case "sprint": return `${n(v("duration"), "秒")} / 速度${n(v("speedMultiplier"))}倍`;
       case "teleporter": return `${p(v("chance"))}でワープ`;
       case "immortality": return `${v("saves")}回復帰 / ${n(v("boostMultiplier"))}倍${n(v("boostDuration"), "秒")}`;
-      case "mirror": return `BOUNCE ${n(v("duration"), "s")} / HP${p(v("damage"))}`;
+      case "mirror": return `反射後${n(v("duration"), "秒")} / HP${p(v("damage"))}`;
       case "rebound": return `打ち返し後${n(v("multiplier"))}倍`;
       case "phantom": return `${v("count")}発 / HP${p(v("damage"))}`;
       case "aura": return `半径${v("radius")} / 0.1秒毎攻撃力${p(v("damage"))}`;

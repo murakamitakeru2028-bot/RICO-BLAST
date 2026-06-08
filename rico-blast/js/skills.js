@@ -178,12 +178,12 @@ const SKILLS = {
   },
   shatter: {
     id: "shatter",
-    name: "SHATTER",
+    name: "シャッター",
     type: "ball",
     category: "attack",
     color: "#ff5f88",
     maxLevel: 5,
-    description: "Low HP blocks near a destroyed block take follow-up damage."
+    description: "破壊したブロック周辺の低HPブロックへ追撃ダメージ"
   },
   poison: {
     id: "poison",
