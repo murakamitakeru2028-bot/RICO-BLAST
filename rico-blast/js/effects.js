@@ -1,5 +1,6 @@
 const Effects = {
   particles: [],
+  bursts: [],
   popups: [],
   damageNumbers: [],
   rings: [],
@@ -8,36 +9,150 @@ const Effects = {
   shakeElapsed: 0,
   rewardFlash: null,
 
-  spawnBlockBreak(x, y, color) {
-    const count = randomInt(14, 20);
+  spawnBlockBreak(x, y, color, options = {}) {
+    const special = !!options.special;
+    const combo = Math.max(0, options.combo || 0);
+    const intensity = clamp(1 + Math.min(combo, 40) / 80 + (special ? 0.42 : 0), 1, 1.85);
+    const accent = special ? "#ffe66b" : (options.accent || "#f6fbff");
+    const count = Math.round(randomInt(22, 31) * intensity);
+
+    this.bursts.push({
+      x,
+      y,
+      color,
+      accent,
+      radius: 4,
+      maxRadius: 30 + 12 * intensity,
+      life: 0.2 + 0.04 * intensity,
+      maxLife: 0.2 + 0.04 * intensity,
+      opacity: special ? 0.95 : 0.72
+    });
+    this.rings.push({
+      x,
+      y,
+      color: accent,
+      radius: 4,
+      maxRadius: 16 + 8 * intensity,
+      lineWidth: special ? 3 : 2.4,
+      life: 0.14,
+      maxLife: 0.14
+    });
     this.rings.push({
       x,
       y,
       color,
       radius: 0,
-      maxRadius: 26,
-      lineWidth: 2,
-      life: 0.24,
-      maxLife: 0.24
+      maxRadius: 32 + 11 * intensity,
+      lineWidth: 2.2,
+      life: 0.28 + 0.06 * intensity,
+      maxLife: 0.28 + 0.06 * intensity
     });
-    for (let i = 0; i < count; i += 1) {
+
+    const sparkCount = Math.round(randomInt(9, 14) * intensity);
+    for (let i = 0; i < sparkCount; i += 1) {
       const angle = rand(0, Math.PI * 2);
-      const speed = rand(2.4, 7.2);
+      const speed = rand(5.8, 10.5) * intensity;
       this.particles.push({
         x,
         y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        size: rand(2, 4.5),
-        rotation: rand(0, Math.PI * 2),
-        spin: rand(-0.28, 0.28),
-        shape: Math.random() < 0.55 ? "diamond" : "square",
-        color,
-        glow: Math.random() < 0.35,
-        life: rand(0.34, 0.5),
-        maxLife: 0.5
+        size: rand(8, 15) * intensity,
+        rotation: angle,
+        spin: 0,
+        shape: "spark",
+        color: Math.random() < 0.38 ? accent : color,
+        glow: true,
+        blend: true,
+        drag: 0.82,
+        gravity: 0.02,
+        life: rand(0.16, 0.28),
+        maxLife: 0.28
       });
     }
+
+    for (let i = 0; i < count; i += 1) {
+      const angle = rand(0, Math.PI * 2);
+      const speed = rand(2.9, 8.8) * intensity;
+      this.particles.push({
+        x: x + rand(-2, 2),
+        y: y + rand(-2, 2),
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: rand(2.2, 5.6) * (special ? 1.08 : 1),
+        rotation: rand(0, Math.PI * 2),
+        spin: rand(-0.42, 0.42),
+        shape: Math.random() < 0.55 ? "diamond" : "square",
+        color: Math.random() < 0.22 ? accent : color,
+        glow: Math.random() < 0.58,
+        blend: Math.random() < 0.28,
+        drag: rand(0.88, 0.94),
+        gravity: rand(0.05, 0.12),
+        life: rand(0.38, 0.62),
+        maxLife: 0.62
+      });
+    }
+
+    if (special) {
+      for (let i = 0; i < 8; i += 1) {
+        const angle = (Math.PI * 2 * i) / 8 + rand(-0.08, 0.08);
+        const speed = rand(7.5, 11);
+        this.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: rand(10, 18),
+          rotation: angle,
+          spin: 0,
+          shape: "spark",
+          color: accent,
+          glow: true,
+          blend: true,
+          drag: 0.84,
+          gravity: 0.01,
+          life: 0.34,
+          maxLife: 0.34
+        });
+      }
+    }
+
+    this.shakeScreen(special ? 1.8 : 0.72, special ? 0.12 : 0.055);
+    this.trimEffects();
+  },
+
+  spawnImpactSpark(x, y, color) {
+    this.rings.push({
+      x,
+      y,
+      color,
+      radius: 0,
+      maxRadius: 12,
+      lineWidth: 1.4,
+      life: 0.12,
+      maxLife: 0.12
+    });
+    for (let i = 0; i < 5; i += 1) {
+      const angle = rand(0, Math.PI * 2);
+      const speed = rand(2.2, 5.2);
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: rand(5, 9),
+        rotation: angle,
+        shape: "spark",
+        color,
+        glow: true,
+        blend: true,
+        drag: 0.85,
+        gravity: 0.02,
+        life: 0.16,
+        maxLife: 0.16
+      });
+    }
+    this.trimEffects();
   },
 
   spawnTokenCollect(x, y, amount = 1) {
@@ -290,6 +405,12 @@ const Effects = {
     }
   },
 
+  trimEffects() {
+    if (this.particles.length > 260) this.particles.splice(0, this.particles.length - 260);
+    if (this.rings.length > 54) this.rings.splice(0, this.rings.length - 54);
+    if (this.bursts.length > 24) this.bursts.splice(0, this.bursts.length - 24);
+  },
+
   update(dt) {
     const frame = dt * 60;
     for (const particle of [...this.particles]) {
@@ -297,9 +418,18 @@ const Effects = {
       particle.x += particle.vx * frame;
       particle.y += particle.vy * frame;
       particle.rotation += (particle.spin || 0) * frame;
-      particle.vx *= Math.pow(0.92, frame);
-      particle.vy = particle.vy * Math.pow(0.92, frame) + 0.1 * frame;
+      const drag = particle.drag || 0.92;
+      const gravity = Number.isFinite(particle.gravity) ? particle.gravity : 0.1;
+      particle.vx *= Math.pow(drag, frame);
+      particle.vy = particle.vy * Math.pow(drag, frame) + gravity * frame;
       if (particle.life <= 0) this.remove(this.particles, particle);
+    }
+
+    for (const burst of [...this.bursts]) {
+      burst.life -= dt;
+      const progress = 1 - burst.life / burst.maxLife;
+      burst.radius = progress * (burst.maxRadius || 36);
+      if (burst.life <= 0) this.remove(this.bursts, burst);
     }
 
     for (const popup of [...this.popups]) {
@@ -358,18 +488,45 @@ const Effects = {
   },
 
   draw(ctx) {
+    for (const burst of this.bursts) {
+      const progress = 1 - burst.life / burst.maxLife;
+      const alpha = clamp(burst.life / burst.maxLife, 0, 1);
+      const radius = Math.max(2, burst.radius || burst.maxRadius * progress);
+      const gradient = ctx.createRadialGradient(burst.x, burst.y, 0, burst.x, burst.y, radius);
+      gradient.addColorStop(0, burst.accent || "#ffffff");
+      gradient.addColorStop(0.22, burst.color);
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = Math.min(1, alpha * (burst.opacity || 0.72) * (1.2 - progress * 0.35));
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(burst.x, burst.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     for (const particle of this.particles) {
       const alpha = clamp(particle.life / particle.maxLife, 0, 1);
       ctx.save();
-      ctx.globalAlpha = alpha;
+      if (particle.blend) ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = Math.min(1, alpha * (particle.alphaBoost || 1));
       ctx.translate(particle.x, particle.y);
       ctx.rotate(particle.rotation || 0);
       if (particle.glow) {
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = particle.shape === "spark" ? 12 : 8;
         ctx.shadowColor = particle.color;
       }
       ctx.fillStyle = particle.color;
-      if (particle.shape === "diamond") {
+      if (particle.shape === "spark") {
+        ctx.strokeStyle = particle.color;
+        ctx.lineWidth = Math.max(1.2, particle.size * 0.18);
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(-particle.size * 0.45, 0);
+        ctx.lineTo(particle.size * 0.75, 0);
+        ctx.stroke();
+      } else if (particle.shape === "diamond") {
         const s = particle.size;
         ctx.beginPath();
         ctx.moveTo(0, -s);
@@ -450,6 +607,7 @@ const Effects = {
 
   clear() {
     this.particles = [];
+    this.bursts = [];
     this.popups = [];
     this.damageNumbers = [];
     this.rings = [];

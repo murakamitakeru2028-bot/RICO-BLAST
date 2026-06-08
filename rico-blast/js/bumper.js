@@ -2,6 +2,7 @@ class Bumper {
   constructor() {
     this.isBumper = true;
     this.skills = [];
+    this.unlocked = false;
     this.level = 0;
     this.maxLevel = 10;
     this.x = 0;
@@ -17,7 +18,7 @@ class Bumper {
   }
 
   isOwned() {
-    return this.level > 0;
+    return this.unlocked && this.level > 0;
   }
 
   setPosition(canvasWidth, canvasHeight) {
@@ -28,6 +29,17 @@ class Bumper {
   }
 
   syncStats() {
+    if (!this.unlocked) {
+      this.level = 0;
+      this.maxHp = 0;
+      this.hp = 0;
+      this.broken = false;
+      this.reviveTimer = 0;
+      this.flashTimer = 0;
+      this.hitFlashTimer = 0;
+      return;
+    }
+
     const ownedHp = Math.max(0, this.level || 0);
     const fortify = getSkillLevel(this, "bumperFortify");
     const nextMaxHp = fortify > 0 ? Math.max(ownedHp, skillParam("bumperFortify", fortify, "hp", ownedHp)) : ownedHp;
@@ -75,7 +87,7 @@ class Bumper {
   }
 
   getReviveTime() {
-    if (this.level <= 0) return 0;
+    if (!this.unlocked || this.level <= 0) return 0;
     const recover = getSkillLevel(this, "bumperRecover");
     if (recover > 0) return skillParam("bumperRecover", recover, "seconds", 1);
     const levelTime = 10 * Math.pow(0.9, Math.max(0, this.level - 1));

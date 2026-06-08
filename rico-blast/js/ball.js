@@ -25,6 +25,7 @@ class Ball {
     this.blockHitCounts = new Map();
     this.paddlelessHits = 0;
     this.penetrationLeft = 0;
+    this.penetrationDamageLeft = 0;
     this.fallSaves = 0;
     this.sprintTimer = 0;
     this.berserkTimer = 0;
@@ -52,6 +53,7 @@ class Ball {
     if (Math.abs(this.vx) < 1) this.vx = this.vx < 0 ? -1.2 : 1.2;
     this.vy = -5;
     this.penetrationLeft = getSkillLevel(this, "penetration");
+    this.penetrationDamageLeft = 0;
     this.fallSaves = skillParam("immortality", getSkillLevel(this, "immortality"), "saves", 0);
     this.firstHitAfterPaddle = true;
     this.paddlelessHits = 0;
@@ -81,6 +83,7 @@ class Ball {
     this.blockHitCounts.clear();
     this.firstHitAfterPaddle = true;
     this.paddlelessHits = 0;
+    this.penetrationDamageLeft = 0;
     this.path = [];
     this.followPaddleLaunchPosition(game, 0, 1);
   }
@@ -237,7 +240,10 @@ class Ball {
       this.vy = Math.abs(this.vy);
       bounced = true;
     }
-    if (bounced) AudioSystem.playWallBounce();
+    if (bounced) {
+      this.penetrationDamageLeft = 0;
+      AudioSystem.playWallBounce();
+    }
     if (this.y - this.radius > game.height) this.onFall(game);
   }
 
@@ -266,6 +272,7 @@ class Ball {
     this.paddlelessHits = 0;
     game.combo = 0;
     this.penetrationLeft = getSkillLevel(this, "penetration");
+    this.penetrationDamageLeft = 0;
     this.fallSaves = skillParam("immortality", getSkillLevel(this, "immortality"), "saves", 0);
     this.spreadUsed = false;
 
@@ -306,6 +313,7 @@ class Ball {
   checkBumper(game, prevX = this.x, prevY = this.y) {
     if (!game.bumper || !game.bumper.hit(game, this, prevX, prevY)) return;
     this.paddlelessHits = 0;
+    this.penetrationDamageLeft = 0;
     game.combo = 0;
     this.blockHitCounts.clear();
   }
@@ -324,16 +332,20 @@ class Ball {
     for (const { block, collision } of collisions) {
       if (!this.alive || hits >= 3) break;
       if (!game.blocks.includes(block) || this.hitCooldowns.has(block.id)) continue;
-      this.hitBlock(game, block, collision);
+      const passedThrough = this.hitBlock(game, block, collision);
       hits += 1;
+      if (!passedThrough) break;
     }
   }
 
   hitBlock(game, block, collision = null) {
     this.hitCooldowns.set(block.id, 0.08);
     game.registerHit(this, block);
-    const damage = this.getDamage(game, block);
-    const destroyed = game.damageBlock(block, damage, this, "ball");
+    const damage = this.penetrationDamageLeft > 0 ? this.penetrationDamageLeft : this.getDamage(game, block);
+    const hpBefore = Math.max(0, block.hp);
+    const damageOptions = { collision };
+    const appliedDamage = game.getBlockDamageAmount ? game.getBlockDamageAmount(block, damage, "ball", damageOptions) : damage;
+    const destroyed = game.damageBlock(block, damage, this, "ball", 0, damageOptions);
 
     const poison = getSkillLevel(this, "poison");
     if (poison > 0 && !destroyed) block.addPoison(poison, this);
@@ -362,11 +374,12 @@ class Ball {
       Effects.showPopup("DOUBLE", block.cx, block.cy, SKILLS.doubleChance.color);
     }
 
-    if (this.shouldPenetrate()) {
-      this.penetrationLeft -= 1;
-    } else {
-      this.reflectFromBlock(block, collision);
-    }
+    const overflowDamage = destroyed ? Math.max(0, appliedDamage - hpBefore) : 0;
+    if (this.consumePenetration(overflowDamage)) return true;
+
+    this.penetrationDamageLeft = 0;
+    this.reflectFromBlock(block, collision);
+    return false;
   }
 
   getDamage(game, block) {
@@ -400,7 +413,7 @@ class Ball {
     }
 
     const expert = getSkillLevel(this, "expert");
-    if (expert > 0) damage *= 1 + getAverageSkillLevel(this) * skillParam("expert", expert, "perAverageLevel", 0);
+    if (expert > 0) damage *= getExpertMultiplier(expert, getAverageSkillLevel(this));
 
     if (this.reboundBonus > 0) {
       damage *= 1 + this.reboundBonus;
@@ -447,11 +460,19 @@ class Ball {
     return Math.max(1, Math.round(this.getBaseDamage(game) * scale));
   }
 
-  shouldPenetrate() {
-    return this.penetrationLeft > 0;
+  consumePenetration(overflowDamage = 0) {
+    const remainingDamage = Math.max(0, overflowDamage);
+    if (this.penetrationLeft <= 0 || remainingDamage <= 0) {
+      this.penetrationDamageLeft = 0;
+      return false;
+    }
+    this.penetrationLeft -= 1;
+    this.penetrationDamageLeft = remainingDamage;
+    return true;
   }
 
   reflectFromBlock(block, collision = null) {
+    this.penetrationDamageLeft = 0;
     let normalX = collision ? collision.normalX : 0;
     let normalY = collision ? collision.normalY : 0;
 
@@ -483,6 +504,7 @@ class Ball {
   }
 
   onFall(game) {
+    this.penetrationDamageLeft = 0;
     const immortality = getSkillLevel(this, "immortality");
     if (immortality > 0 && this.fallSaves > 0) {
       this.fallSaves -= 1;
@@ -512,6 +534,7 @@ class Ball {
     this.y = game.height + this.radius + 1;
     game.combo = 0;
     this.paddlelessHits = 0;
+    this.penetrationDamageLeft = 0;
     this.blockHitCounts.clear();
   }
 

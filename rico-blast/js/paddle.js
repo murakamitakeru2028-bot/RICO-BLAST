@@ -19,9 +19,13 @@ class Paddle {
     return level > 0 ? skillParam("paddleWidth", level, "width", this.baseWidth) : this.baseWidth;
   }
 
+  getY(canvasHeight) {
+    return canvasHeight - 28 - this.height * 4;
+  }
+
   setPosition(canvasWidth, canvasHeight) {
     const width = this.getWidth();
-    this.y = canvasHeight - 28;
+    this.y = this.getY(canvasHeight);
     this.x = canvasWidth / 2 - width / 2;
     this.targetX = canvasWidth / 2;
   }
@@ -58,7 +62,7 @@ class Paddle {
     const delta = desiredX - this.x;
     const maxMove = 8 * frame;
     this.x += clamp(delta, -maxMove, maxMove);
-    this.y = game.height - 28;
+    this.y = this.getY(game.height);
     this.bounceTimer = Math.max(0, this.bounceTimer - dt);
     this.damageFlashTimer = Math.max(0, this.damageFlashTimer - dt);
     this.healFlashTimer = Math.max(0, this.healFlashTimer - dt);

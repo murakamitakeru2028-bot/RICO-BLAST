@@ -131,6 +131,7 @@ button {
 }
 
 #hud-score-block {
+  position: relative;
   grid-column: 2;
   display: flex;
   flex-direction: column;
@@ -155,6 +156,48 @@ button {
   font-weight: 700;
   font-size: 26px;
   line-height: 1;
+}
+
+#score-gain-text {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 50%;
+  translate: -50% 0;
+  z-index: 6;
+  min-width: 54px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255,230,107,0.3);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255,230,107,0.16), rgba(255,230,107,0.055)),
+    rgba(9,11,20,0.92);
+  color: #fff7c7;
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.16) inset,
+    0 0 14px rgba(255,230,107,0.16);
+}
+
+#score-gain-text.active {
+  animation: tokenGainPop 0.72s ease both;
+}
+
+#score-gain-text.boosted {
+  border-color: rgba(124,245,178,0.38);
+  color: #7cf5b2;
+  background:
+    linear-gradient(180deg, rgba(124,245,178,0.17), rgba(255,230,107,0.05)),
+    rgba(9,11,20,0.92);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.16) inset,
+    0 0 16px rgba(124,245,178,0.18);
 }
 
 .hud-button {
@@ -494,6 +537,11 @@ button {
   justify-content: center;
 }
 
+#screen-upgrade.game-panel.active {
+  align-items: flex-end;
+  justify-content: center;
+}
+
 #screen-gameover.game-panel {
   z-index: 40;
   padding: 22px;
@@ -515,42 +563,120 @@ button {
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  padding: 0;
-  background: #0d0d1a;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  gap: 6px;
+  padding: 7px 8px;
+  background:
+    linear-gradient(180deg, rgba(246,251,255,0.035), rgba(246,251,255,0.012)),
+    #0d0d1a;
+  border-top: 1px solid rgba(103,216,255,0.12);
+  border-bottom: 1px solid rgba(255,255,255,0.055);
 }
 
 #slot-bar .slot {
   flex-direction: column;
   justify-content: flex-start;
   align-items: stretch;
-  gap: 3px;
-  padding: 4px 6px;
-  border: 0;
-  border-right: 1px solid rgba(255,255,255,0.06);
-  border-radius: 0;
-  background: #0d0d1a;
-  box-shadow: none;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid rgba(246,251,255,0.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.016)),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-skill-color, #67d8ff) 9%, transparent), transparent 54%),
+    #111524;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 8px 16px rgba(0,0,0,0.13);
 }
 
 #slot-bar .slot:last-child {
-  border-right: 0;
+  border-right: 1px solid rgba(246,251,255,0.12);
 }
 
 /* 未購入ボールは非常に薄く表示 */
 #slot-bar .slot.empty {
-  opacity: 0.25;
-  border-style: solid;
+  opacity: 0.42;
+  border-style: dashed;
+  border-color: rgba(246,251,255,0.1);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.032), rgba(255,255,255,0.01)),
+    #0f1320;
 }
 
 #slot-bar .slot.locked {
   opacity: 0.38;
 }
 
+#slot-bar .slot.has-skills {
+  border-color: color-mix(in srgb, var(--primary-skill-color, #67d8ff) 62%, rgba(255,255,255,0.1));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.016)),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-skill-color, #67d8ff) 19%, transparent), transparent 58%),
+    #111524;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.07) inset,
+    0 0 15px color-mix(in srgb, var(--primary-skill-color, #67d8ff) 16%, transparent);
+}
+
 #slot-bar .slot.buyable {
-  opacity: 0.6;
+  opacity: 0.82;
+  border-color: rgba(255,230,107,0.38);
+  background:
+    linear-gradient(180deg, rgba(255,230,107,0.07), rgba(255,255,255,0.012)),
+    #121421;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 0 14px rgba(255,230,107,0.1);
+}
+
+#slot-bar .slot.fallen {
+  border-color: rgba(255,95,136,0.58);
+  background:
+    linear-gradient(180deg, rgba(255,95,136,0.11), rgba(255,95,136,0.022)),
+    #16111b;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 0 15px rgba(255,95,136,0.1);
+}
+
+#slot-bar .slot.fallen.reviving {
+  border-color: rgba(103,216,255,0.48);
+  background:
+    linear-gradient(180deg, rgba(103,216,255,0.09), rgba(103,216,255,0.022)),
+    linear-gradient(135deg, rgba(103,216,255,0.1), transparent 58%),
+    #111524;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 0 15px rgba(103,216,255,0.1);
+}
+
+#slot-bar .slot.targetable,
+#slot-bar .slot.selected-upgrade,
+#slot-bar .slot.selected-skill,
+#slot-bar .slot.launch-ready {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.1) inset,
+    0 0 0 1px color-mix(in srgb, var(--selected-color, var(--target-color, var(--primary-skill-color, #7cf5b2))) 32%, transparent) inset,
+    0 0 20px color-mix(in srgb, var(--selected-color, var(--target-color, var(--primary-skill-color, #7cf5b2))) 22%, transparent);
+}
+
+#slot-bar .slot.targetable {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--target-color, #ffe66b) 12%, transparent), rgba(255,255,255,0.022)),
+    #111524;
+}
+
+#slot-bar .slot.selected-upgrade,
+#slot-bar .slot.selected-skill {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--selected-color, var(--primary-skill-color, #67d8ff)) 15%, transparent), rgba(255,255,255,0.028)),
+    #111524;
+}
+
+#slot-bar .slot.launch-ready {
+  background:
+    linear-gradient(180deg, rgba(74,255,136,0.1), rgba(74,255,136,0.024)),
+    #111524;
 }
 
 #slot-bar .slot-icon {
@@ -606,7 +732,7 @@ button {
 
 /* リバイブ中スキル行 */
 .skill-row.revive {
-  border-left: 2px solid #ff4a4a;
+  border-left: 2px solid #67d8ff;
 }
 
 .skill-row-name {
@@ -626,7 +752,7 @@ button {
 }
 
 .skill-row.revive .skill-row-name {
-  color: #ff4a4a;
+  color: #b7f0ff;
   font-family: "Space Mono", monospace;
   font-size: 9px;
 }
@@ -809,6 +935,16 @@ button {
     0 0 14px rgba(255,74,74,0.08);
 }
 
+.slot.fallen.reviving {
+  border-color: rgba(103,216,255,0.48);
+  background:
+    linear-gradient(180deg, rgba(103,216,255,0.09), rgba(103,216,255,0.02)),
+    #111524;
+  box-shadow:
+    0 0 0 1px rgba(103,216,255,0.13) inset,
+    0 0 14px rgba(103,216,255,0.08);
+}
+
 .slot.reviving::before {
   content: "";
   position: absolute;
@@ -818,11 +954,11 @@ button {
   height: var(--revive-fill, 0%);
   z-index: 0;
   background:
-    linear-gradient(180deg, rgba(246,251,255,0.34), rgba(103,216,255,0.48) 45%, rgba(124,245,178,0.5)),
-    color-mix(in srgb, var(--primary-skill-color, #67d8ff) 36%, transparent);
+    linear-gradient(180deg, rgba(246,251,255,0.2), rgba(103,216,255,0.42) 42%, rgba(74,158,255,0.34)),
+    linear-gradient(90deg, rgba(103,216,255,0.12), rgba(183,240,255,0.34), rgba(103,216,255,0.12));
   box-shadow:
-    0 -1px 0 rgba(246,251,255,0.24) inset,
-    0 -10px 18px color-mix(in srgb, var(--primary-skill-color, #67d8ff) 20%, transparent);
+    0 -1px 0 rgba(246,251,255,0.18) inset,
+    0 -8px 16px rgba(103,216,255,0.16);
   transition: height 0.18s linear;
 }
 
@@ -1071,9 +1207,9 @@ button {
   grid-template-rows: auto 8px;
   gap: 6px;
   padding: 6px;
-  border: 1px solid rgba(255,122,141,0.24);
+  border: 1px solid rgba(103,216,255,0.24);
   border-radius: 6px;
-  background: rgba(255,74,74,0.055);
+  background: rgba(103,216,255,0.055);
 }
 
 .slot-revive-head {
@@ -1082,7 +1218,7 @@ button {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
-  color: rgba(255,176,188,0.72);
+  color: rgba(183,240,255,0.72);
   font-family: "Space Mono", monospace;
   font-size: 7px;
   font-weight: 700;
@@ -1097,7 +1233,7 @@ button {
 }
 
 .slot-revive-head b {
-  color: #ffb0bc;
+  color: #b7f0ff;
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -1116,8 +1252,8 @@ button {
   height: 100%;
   min-width: 4px;
   border-radius: inherit;
-  background: linear-gradient(90deg, #ff4a4a, #ffcc4a, #4aff88);
-  box-shadow: 0 0 10px rgba(255,122,141,0.2);
+  background: linear-gradient(90deg, #3a7bd5, #67d8ff, #b7f0ff);
+  box-shadow: 0 0 10px rgba(103,216,255,0.2);
   transition: width 0.12s linear;
 }
 
@@ -1391,11 +1527,11 @@ button {
 }
 
 #game-stage .skill-panel {
-  width: min(100%, 366px);
-  max-height: 68%;
+  width: min(100%, 386px);
+  max-height: 76%;
   height: auto;
-  gap: 7px;
-  padding: 10px;
+  gap: 8px;
+  padding: 12px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 8px;
@@ -1411,42 +1547,42 @@ button {
 #game-stage .skill-panel .overlay-kicker {
   margin-bottom: 0;
   color: color-mix(in srgb, var(--accent-green) 42%, var(--text-muted));
-  font-size: 8px;
+  font-size: 9px;
 }
 
 #game-stage .skill-panel .overlay-title {
   margin-bottom: 0;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 #skill-reroll-row {
   flex: 0 0 auto;
-  min-height: 34px;
+  min-height: 38px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(112px, auto);
+  grid-template-columns: minmax(0, 1fr) minmax(124px, auto);
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   margin-top: 0;
-  padding-top: 6px;
+  padding-top: 7px;
   border-top: 1px solid rgba(255,255,255,0.07);
 }
 
 .skill-reroll-status {
   min-width: 0;
   overflow: hidden;
-  min-height: 34px;
+  min-height: 38px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: auto auto;
   align-content: center;
   column-gap: 7px;
-  padding: 6px 8px;
+  padding: 7px 9px;
   border: 1px solid rgba(255,230,107,0.22);
   border-radius: 7px;
   background: rgba(255,230,107,0.055);
   color: var(--text-secondary);
   font-family: "Space Mono", monospace;
-  font-size: 8px;
+  font-size: 8.5px;
   font-weight: 700;
   line-height: 1.05;
   white-space: nowrap;
@@ -1457,8 +1593,8 @@ button {
   content: "";
   grid-row: 1 / 3;
   align-self: center;
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   transform: rotate(45deg);
   border: 1px solid rgba(255,255,255,0.42);
   border-radius: 2px;
@@ -1469,19 +1605,19 @@ button {
 .skill-reroll-status b {
   display: block;
   color: var(--token-color);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1;
 }
 
 .btn-reroll {
   min-width: 0;
-  height: 34px;
+  height: 38px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 0 9px;
+  padding: 0 10px;
   border: 1px solid rgba(255,255,255,0.13);
   border-radius: 7px;
   background:
@@ -1489,7 +1625,7 @@ button {
     #1e1e3a;
   color: var(--text-primary);
   font-family: "Space Mono", monospace;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -1519,14 +1655,14 @@ button {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
   min-height: 0;
   flex: 0 1 auto;
   align-items: stretch;
 }
 
 #ball-picker:not(:empty) + #skill-reroll-row {
-  margin-top: 5px;
+  margin-top: 6px;
 }
 
 .skill-panel:has(#ball-picker:not(:empty)) #skill-cards {
@@ -1535,14 +1671,15 @@ button {
 }
 
 .skill-panel:has(#ball-picker:not(:empty)) .skill-card {
-  min-height: 104px;
-  gap: 3px;
-  padding: 5px 4px;
+  min-height: 116px;
+  gap: 4px;
+  padding: 6px 5px;
 }
 
 .skill-panel:has(#ball-picker:not(:empty)) .skill-icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
 }
 
 .skill-panel:has(#ball-picker:not(:empty)) .skill-description {
@@ -1554,17 +1691,17 @@ button {
 }
 
 .skill-card {
-  min-height: 168px;
+  min-height: 184px;
   width: 100%;
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: auto minmax(0, 1fr);
   align-items: start;
   justify-items: stretch;
-  gap: 6px;
-  padding: 7px 6px;
+  gap: 7px;
+  padding: 9px 7px;
   border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 7px;
+  border-radius: 8px;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--skill-color, #ffffff) 10%, transparent), rgba(255,255,255,0.014)),
     #17172e;
@@ -1604,13 +1741,13 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 7px;
 }
 
 .skill-icon {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
   border: 1px solid rgba(232, 248, 255, 0.56);
   border-radius: 50%;
   box-shadow: none;
@@ -1620,7 +1757,7 @@ button {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   align-items: stretch;
   width: 100%;
 }
@@ -1630,7 +1767,7 @@ button {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 3px;
+  gap: 4px;
   width: 100%;
 }
 
@@ -1639,7 +1776,7 @@ button {
   overflow: hidden;
   color: var(--text-primary);
   max-width: 100%;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 800;
   line-height: 1.15;
   white-space: normal;
@@ -1652,14 +1789,14 @@ button {
 .skill-stars {
   flex: 0 0 auto;
   font-family: "Space Mono", monospace;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1;
   letter-spacing: 0;
 }
 
 .skill-description {
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1.32;
   text-align: left;
@@ -1673,13 +1810,13 @@ button {
   align-self: flex-start;
   max-width: 100%;
   overflow: hidden;
-  padding: 3px 5px;
+  padding: 4px 6px;
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 5px;
   color: color-mix(in srgb, var(--skill-color, #ffffff) 72%, var(--text-secondary));
   background: color-mix(in srgb, var(--skill-color, #ffffff) 10%, transparent);
   font-family: "Space Mono", monospace;
-  font-size: 7px;
+  font-size: 7.5px;
   font-weight: 700;
   line-height: 1;
 }
@@ -1688,17 +1825,17 @@ button {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   margin-top: auto;
 }
 
 .skill-effect-lines span {
   min-width: 0;
   display: grid;
-  grid-template-columns: 25px minmax(0, 1fr);
+  grid-template-columns: 30px minmax(0, 1fr);
   align-items: start;
-  gap: 4px;
-  padding: 4px 5px;
+  gap: 5px;
+  padding: 5px 6px;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 5px;
   background: rgba(255,255,255,0.035);
@@ -1716,12 +1853,12 @@ button {
 
 .skill-effect-lines b {
   color: color-mix(in srgb, var(--skill-color, #ffffff) 72%, var(--text-muted));
-  font-size: 7px;
+  font-size: 7.5px;
 }
 
 .skill-effect-lines em {
   color: var(--text-primary);
-  font-size: 7.5px;
+  font-size: 8.2px;
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -1754,8 +1891,8 @@ button {
 }
 
 .target-avatar {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   display: block;
   border: 1px solid rgba(255,255,255,0.25);
   border-radius: 50%;
@@ -1801,7 +1938,7 @@ button {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .target-kicker {
@@ -1817,7 +1954,7 @@ button {
   overflow: hidden;
   color: var(--text-primary);
   font-family: "Space Mono", monospace;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.1;
   white-space: nowrap;
@@ -1829,13 +1966,13 @@ button {
   max-width: 112px;
   overflow: hidden;
   justify-self: end;
-  padding: 4px 6px;
+  padding: 5px 7px;
   border: 1px solid color-mix(in srgb, var(--target-color, #ffffff) 38%, rgba(255,255,255,0.12));
   border-radius: 5px;
   background: color-mix(in srgb, var(--target-color, #ffffff) 12%, transparent);
   color: color-mix(in srgb, var(--target-color, #ffffff) 82%, #ffffff);
   font-family: "Space Mono", monospace;
-  font-size: 8px;
+  font-size: 8.5px;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
@@ -1853,26 +1990,26 @@ button {
 }
 
 .skill-target-panel {
-  padding: 7px;
-  max-height: 138px;
+  padding: 8px;
+  max-height: 154px;
   overflow: hidden;
 }
 
 .skill-target-grid {
   display: grid;
   grid-template-columns: repeat(var(--target-count, 3), minmax(0, 1fr));
-  gap: 5px;
-  margin-top: 6px;
+  gap: 6px;
+  margin-top: 7px;
 }
 
 .ball-target {
   min-width: 0;
-  min-height: 70px;
+  min-height: 78px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 5px;
-  padding: 6px;
+  gap: 6px;
+  padding: 7px;
   border: 1px solid color-mix(in srgb, var(--target-color, #ffe66b) 38%, rgba(255,255,255,0.12));
   border-radius: 7px;
   background:
@@ -1902,12 +2039,12 @@ button {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 
 .ball-target-icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border: 1px solid rgba(255,255,255,0.28);
   border-radius: 50%;
   box-shadow: 0 0 10px color-mix(in srgb, var(--ball-color, #ffffff) 20%, transparent);
@@ -1917,13 +2054,13 @@ button {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .ball-target-label {
   color: var(--text-primary);
   font-family: "Space Mono", monospace;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
@@ -1932,7 +2069,7 @@ button {
   min-width: 0;
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
@@ -1940,7 +2077,7 @@ button {
 }
 
 .ball-target-skills {
-  min-height: 24px;
+  min-height: 28px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -1948,13 +2085,13 @@ button {
 
 .ball-target-state {
   margin-top: auto;
-  padding: 4px 5px;
+  padding: 5px 6px;
   border: 1px solid color-mix(in srgb, var(--target-color, #ffe66b) 28%, rgba(255,255,255,0.08));
   border-radius: 5px;
   background: color-mix(in srgb, var(--target-color, #ffe66b) 11%, transparent);
   color: color-mix(in srgb, var(--target-color, #ffe66b) 82%, #ffffff);
   font-family: "Space Mono", monospace;
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -1962,7 +2099,7 @@ button {
 
 .target-skill-chip {
   min-width: 0;
-  height: 14px;
+  height: 16px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -1986,7 +2123,7 @@ button {
   overflow: hidden;
   color: var(--text-primary);
   font-family: "Space Mono", monospace;
-  font-size: 7px;
+  font-size: 7.6px;
   font-style: normal;
   font-weight: 700;
   line-height: 1;
@@ -1999,14 +2136,14 @@ button {
 }
 
 .target-skill-empty {
-  height: 31px;
+  height: 35px;
   display: grid;
   place-items: center;
   border: 1px dashed rgba(255,255,255,0.12);
   border-radius: 5px;
   color: var(--text-muted);
   font-family: "Space Mono", monospace;
-  font-size: 8px;
+  font-size: 8.5px;
   font-weight: 700;
   line-height: 1;
 }
@@ -2052,7 +2189,10 @@ button {
 }
 
 #game-stage .upgrade-panel {
-  width: 100%;
+  width: min(100%, 390px);
+  height: auto;
+  max-height: 76%;
+  flex: 0 1 auto;
 }
 
 #upgrade-list {
@@ -2351,7 +2491,9 @@ button {
 }
 
 #game-stage #upgrade-list {
+  flex: 0 1 auto;
   margin-top: 3px;
+  overflow: hidden;
   padding-right: 0;
 }
 
@@ -2388,6 +2530,7 @@ button {
 }
 
 #game-stage .upgrade-ball {
+  flex: 0 1 auto;
   margin-bottom: 0;
   padding: 7px;
 }
@@ -3423,11 +3566,11 @@ button {
 }
 
 #game-stage .skill-panel .overlay-kicker {
-  font-size: 9px;
+  font-size: 10px;
 }
 
 #game-stage .skill-panel .overlay-title {
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .skill-reroll-status {
@@ -3443,21 +3586,21 @@ button {
 }
 
 .skill-name {
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 
 .skill-stars {
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .skill-description {
-  font-size: 9.5px;
-  line-height: 1.25;
+  font-size: 10px;
+  line-height: 1.28;
   -webkit-line-clamp: 4;
 }
 
 .skill-badge {
-  font-size: 8px;
+  font-size: 8.5px;
 }
 
 .target-kicker,
@@ -3466,21 +3609,21 @@ button {
 .target-skill-chip b,
 .target-skill-chip em,
 .ball-target-state {
-  font-size: 8.5px;
+  font-size: 9px;
 }
 
 .target-title {
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .ball-target-label,
 .ball-picker-title,
 .ball-pick {
-  font-size: 11px;
+  font-size: 11.5px;
 }
 
 .ball-target-name {
-  font-size: 9px;
+  font-size: 9.5px;
 }
 
 .upgrade-simple-title b,
@@ -3720,12 +3863,18 @@ button {
   box-shadow: 0 0 8px var(--skill-color);
 }
 
-.level-badge,
-.slot-revive {
+.level-badge {
   border-radius: 7px;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.018)),
     rgba(255,255,255,0.035);
+}
+
+.slot-revive {
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(103,216,255,0.08), rgba(103,216,255,0.02)),
+    rgba(103,216,255,0.04);
 }
 
 

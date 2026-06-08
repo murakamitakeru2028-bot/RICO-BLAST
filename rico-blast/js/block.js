@@ -8,6 +8,7 @@ class Block {
     this.height = Math.round(height || 22);
     this.type = typeof blockType === "string" ? blockType : (blockType ? "burst" : "stone");
     this.definition = Block.types[this.type] || Block.types.stone;
+    this.gridSpanRows = Math.max(1, this.definition.gridSpanRows || 1);
     this.maxHp = Math.max(1, Math.ceil(hp * this.definition.hpMultiplier));
     this.hp = this.maxHp;
     this.isSpecial = this.type !== "stone";
@@ -19,6 +20,12 @@ class Block {
     this.age = 0;
     this.poisons = [];
     this.colorSet = this.definition.colors;
+    this.extraY = 0;
+    this.diveRemaining = 0;
+    this.diveMax = 0;
+    this.regenTimer = 0.5;
+    this.spawnTimer = 10;
+    this.hasSpawnedBlock = false;
   }
 
   get displayX() {
@@ -49,7 +56,50 @@ class Block {
   update(game, dt) {
     this.age += dt;
     this.sway = 0;
+    this.updateDive(game, dt);
+    this.updateRegen(dt);
+    this.updateSpawner(game, dt);
     this.updatePoison(game, dt);
+  }
+
+  updateDive(game, dt) {
+    if (this.diveRemaining <= 0) return;
+    const frame = dt * 60;
+    const rowPitch = game && game.getBlockRowPitch ? game.getBlockRowPitch() : Math.max(1, this.height);
+    const amount = Math.min(this.diveRemaining, (this.descendSpeed || 0.09) * 3 * frame);
+    this.extraY += amount;
+    this.y += amount;
+    this.diveRemaining -= amount;
+    if (this.diveRemaining <= 0.001) {
+      this.gridRow += 1;
+      this.extraY = 0;
+      this.diveRemaining = 0;
+      this.diveMax = 0;
+      this.y = game && game.getBlockTopY ? game.getBlockTopY(this.gridRow, this.gridSpanRows) : this.y + rowPitch;
+    }
+  }
+
+  startDive(rowPitch) {
+    if (this.effect !== "dive" || this.diveRemaining > 0 || this.hp <= 0) return false;
+    this.diveRemaining = Math.max(1, rowPitch || this.height);
+    this.diveMax = this.diveRemaining;
+    return true;
+  }
+
+  updateRegen(dt) {
+    if (this.effect !== "regen" || this.hp <= 0 || this.hp >= this.maxHp) return;
+    this.regenTimer -= dt;
+    if (this.regenTimer > 0) return;
+    this.regenTimer += 0.5;
+    this.heal(this.maxHp * 0.02);
+  }
+
+  updateSpawner(game, dt) {
+    if (this.effect !== "spawner" || this.hasSpawnedBlock || this.hp <= 0) return;
+    this.spawnTimer = Math.max(0, this.spawnTimer - dt);
+    if (this.spawnTimer > 0) return;
+    this.hasSpawnedBlock = true;
+    if (game && game.spawnNormalBlockNear) game.spawnNormalBlockNear(this);
   }
 
   updatePoison(game, dt) {
@@ -92,6 +142,14 @@ class Block {
     return this.hp <= 0;
   }
 
+  heal(amount) {
+    const recovery = Math.max(0, Number(amount) || 0);
+    if (recovery <= 0 || this.hp <= 0) return 0;
+    const before = this.hp;
+    this.hp = Math.min(this.maxHp, this.hp + recovery);
+    return this.hp - before;
+  }
+
   isDestroyed() {
     return this.hp <= 0;
   }
@@ -111,6 +169,7 @@ class Block {
     const r = 3;
 
     ctx.save();
+    this.drawSpecialAura(ctx, x, y, w, h, r);
     roundedRect(ctx, x, y, w, h, r);
     ctx.fillStyle = colors.empty;
     ctx.fill();
@@ -127,22 +186,84 @@ class Block {
     }
     ctx.restore();
 
+    if (this.effect === "dive" && this.diveRemaining > 0) {
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = "rgba(246,251,255,0.9)";
+      roundedRect(ctx, x + 1, y + 1, w - 2, h - 2, r);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
     if (this.isSpecial) this.drawEffectMark(ctx, x, y, w, h);
 
-    const borderColor = Block.mixColor(colors.accent || colors.body, "#ffffff", this.type === "stone" ? 0.46 : 0.34);
+    const borderColor = this.definition.borderColor ||
+      Block.mixColor(colors.accent || colors.body, "#ffffff", this.type === "stone" ? 0.46 : 0.34);
+    const borderWidth = this.definition.borderWidth || 2;
 
     ctx.globalAlpha = 0.68;
     ctx.strokeStyle = "rgba(0,0,0,0.72)";
-    ctx.lineWidth = 3.1;
+    ctx.lineWidth = borderWidth + 1.1;
     roundedRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, r);
     ctx.stroke();
 
     ctx.strokeStyle = borderColor;
     ctx.globalAlpha = 0.98;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = borderWidth;
     roundedRect(ctx, x + 0.6, y + 0.6, w - 1.2, h - 1.2, r);
     ctx.stroke();
     ctx.restore();
+  }
+
+  drawSpecialAura(ctx, x, y, w, h, r) {
+    const pulse = 0.5 + Math.sin(this.age * Math.PI) * 0.5;
+    if (this.effect === "regen") {
+      ctx.save();
+      ctx.globalAlpha = 0.4 + pulse * 0.6;
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = "rgba(124,245,178,0.72)";
+      ctx.strokeStyle = "rgba(124,245,178,0.55)";
+      ctx.lineWidth = 2;
+      roundedRect(ctx, x - 2, y - 2, w + 4, h + 4, r + 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    if (this.effect === "healBurst") {
+      ctx.save();
+      ctx.globalAlpha = 0.45 + pulse * 0.22;
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = "rgba(255,136,68,0.72)";
+      ctx.strokeStyle = "rgba(255,136,68,0.48)";
+      ctx.lineWidth = 2;
+      roundedRect(ctx, x - 2, y - 2, w + 4, h + 4, r + 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    if (this.effect === "spawner") {
+      ctx.save();
+      const spread = 5 + pulse * 8;
+      ctx.globalAlpha = 0.22 + pulse * 0.18;
+      ctx.strokeStyle = "rgba(170,102,255,0.68)";
+      ctx.lineWidth = 2;
+      roundedRect(ctx, x - spread, y - spread, w + spread * 2, h + spread * 2, r + spread);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    if (this.effect === "dive" && this.diveRemaining > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = "rgba(246,251,255,0.72)";
+      for (let i = 1; i <= 3; i += 1) {
+        roundedRect(ctx, x + 2, y - i * 7, w - 4, h, r);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
   }
 
   drawEffectMark(ctx, x, y, w, h) {
@@ -156,7 +277,37 @@ class Block {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    if (this.effect === "burst") {
+    if (this.effect === "heavy") {
+      ctx.fillStyle = "rgba(246,251,255,0.82)";
+      ctx.fillRect(cx - icon * 0.48, cy - icon * 1.4, 3, icon * 2.8);
+      ctx.fillRect(cx + icon * 0.18, cy - icon * 1.4, 3, icon * 2.8);
+    } else if (this.effect === "armor") {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - icon * 1.05);
+      ctx.lineTo(cx + icon * 0.95, cy + icon * 0.75);
+      ctx.lineTo(cx - icon * 0.95, cy + icon * 0.75);
+      ctx.closePath();
+      ctx.stroke();
+    } else if (this.effect === "dive") {
+      ctx.globalAlpha = this.diveRemaining > 0 ? 0.95 : 0.42;
+      ctx.beginPath();
+      ctx.moveTo(cx, y + h - icon * 0.45);
+      ctx.lineTo(cx + icon * 0.75, y + h - icon * 1.3);
+      ctx.lineTo(cx - icon * 0.75, y + h - icon * 1.3);
+      ctx.closePath();
+      ctx.fill();
+    } else if (this.effect === "healBurst") {
+      ctx.font = `900 ${Math.max(12, Math.min(18, h * 0.52))}px 'Space Mono', monospace`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("!", cx, cy + 0.5);
+    } else if (this.effect === "spawner") {
+      const seconds = Math.max(0, Math.ceil(this.spawnTimer));
+      ctx.font = `800 ${Math.max(8, Math.min(12, h * 0.38))}px 'Space Mono', monospace`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(this.hasSpawnedBlock ? "+" : String(seconds), cx, cy);
+    } else if (this.effect === "burst") {
       ctx.beginPath();
       ctx.arc(cx, cy, icon * 0.28, 0, Math.PI * 2);
       ctx.stroke();
@@ -228,6 +379,79 @@ Block.types = {
       accent: "#2a2a3e"
     }
   },
+  heavy: {
+    effect: "heavy",
+    hpMultiplier: 5,
+    tokenMultiplier: 1,
+    gridSpanRows: 3,
+    borderWidth: 4,
+    borderColor: "rgba(246,251,255,0.92)",
+    colors: {
+      body: "#4b4f62",
+      empty: "#171923",
+      accent: "#f6fbff"
+    }
+  },
+  armor: {
+    effect: "armor",
+    hpMultiplier: 1,
+    tokenMultiplier: 1,
+    borderWidth: 3,
+    borderColor: "rgba(246,251,255,0.9)",
+    colors: {
+      body: "#33394d",
+      empty: "#151824",
+      accent: "#f6fbff"
+    }
+  },
+  dive: {
+    effect: "dive",
+    hpMultiplier: 1,
+    tokenMultiplier: 1,
+    borderWidth: 3,
+    borderColor: "rgba(246,251,255,0.82)",
+    colors: {
+      body: "#394057",
+      empty: "#151824",
+      accent: "#f6fbff"
+    }
+  },
+  regen: {
+    effect: "regen",
+    hpMultiplier: 1,
+    tokenMultiplier: 1,
+    borderWidth: 3,
+    borderColor: "#ff4a4a",
+    colors: {
+      body: "#44303c",
+      empty: "#21151d",
+      accent: "#7cf5b2"
+    }
+  },
+  exploder: {
+    effect: "healBurst",
+    hpMultiplier: 1,
+    tokenMultiplier: 1,
+    borderWidth: 3,
+    borderColor: "#ff4a4a",
+    colors: {
+      body: "#5a2f2a",
+      empty: "#261513",
+      accent: "#ff8844"
+    }
+  },
+  spawner: {
+    effect: "spawner",
+    hpMultiplier: 1,
+    tokenMultiplier: 1,
+    borderWidth: 3,
+    borderColor: "#ff4a4a",
+    colors: {
+      body: "#3b2a56",
+      empty: "#1b1428",
+      accent: "#aa66ff"
+    }
+  },
   burst: {
     effect: "burst",
     hpMultiplier: 1.35,
@@ -290,4 +514,5 @@ Block.types = {
   }
 };
 
+Block.specialTypes = ["heavy", "armor", "dive", "regen", "exploder", "spawner"];
 Block.coloredTypes = ["row", "chain", "tokens", "burst", "column", "aqua"];

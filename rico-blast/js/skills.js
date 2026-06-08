@@ -1,5 +1,7 @@
 const BALL_MAX = 4;
 const BALL_COLORS = ["#ff6b6b", "#4a9eff", "#ffcc4a", "#7cf5b2"];
+const BUMPER_UNLOCK_COST = 10000;
+const BUMPER_SKILL_CHOICE_RATE = 0.4;
 
 const UPGRADE_DEFS = {
   speed: { label: "速度", baseCost: 10, max: 5 },
@@ -18,8 +20,9 @@ const SKILL_LEVELS = {
   overload: { step: [0.2, 0.3, 0.4, 0.5, 0.6], cap: [2, 2.5, 3, 4, 5] },
   fragment: { count: [3, 4, 5, 6, 8], damage: [0.06, 0.07, 0.09, 0.10, 0.11] },
   detonator: { hits: [3, 3, 3, 3, 3], radius: [40, 52, 62, 72, 81], damage: [0.18, 0.22, 0.27, 0.32, 0.36] },
-  poison: { duration: [4, 5, 7, 8, 10], interval: [0.5, 0.5, 0.5, 0.5, 0.5], damage: [0.015, 0.02, 0.025, 0.03, 0.04] },
-  afterburn: { radius: [25, 30, 35, 38, 42], duration: [3, 4, 5, 6, 8], damage: [0.015, 0.02, 0.025, 0.03, 0.04], projectileBuff: [1.2, 1.3, 1.4, 1.48, 1.55] },
+  shatter: { threshold: [0.15, 0.20, 0.25, 0.28, 0.32], radius: [80, 100, 130, 155, 176], damage: [0.06, 0.07, 0.09, 0.10, 0.11] },
+  poison: { duration: [4, 5, 7, 8, 10], interval: [0.5, 0.5, 0.5, 0.5, 0.5], damage: [0.03, 0.04, 0.05, 0.065, 0.08] },
+  afterburn: { radius: [25, 30, 35, 38, 42], duration: [3, 4, 5, 6, 8], damage: [0.03, 0.04, 0.05, 0.06, 0.08], projectileBuff: [1.25, 1.35, 1.45, 1.52, 1.65] },
   lightning: { count: [2, 2, 3, 4, 5], radius: [100, 130, 160, 185, 210], damage: [0.10, 0.13, 0.16, 0.19, 0.22] },
   blast: { height: [6, 8, 12, 15, 18], damage: [0.10, 0.13, 0.17, 0.21, 0.24] },
   impact: { multiplier: [1.4, 1.6, 1.75, 1.9, 2.0] },
@@ -30,11 +33,15 @@ const SKILL_LEVELS = {
   mirror: { interval: [1.5, 1.2, 1.0, 0.7, 0.5], damage: [0.08, 0.10, 0.13, 0.16, 0.18] },
   rebound: { multiplier: [1.3, 1.5, 1.65, 1.8, 2.0] },
   phantom: { count: [2, 3, 3, 4, 5], damage: [0.10, 0.13, 0.17, 0.21, 0.25], reviveLevel: [3, 3, 3, 3, 3] },
-  aura: { radius: [50, 60, 72, 82, 90], interval: [0.1, 0.1, 0.1, 0.1, 0.1], damage: [0.015, 0.022, 0.03, 0.04, 0.05] },
+  aura: { radius: [70, 80, 95, 110, 125], interval: [0.1, 0.1, 0.1, 0.1, 0.1], damage: [0.03, 0.045, 0.06, 0.075, 0.09] },
   berserker: { duration: [4, 6, 8, 9, 10], speedMultiplier: [1.1, 1.12, 1.15, 1.18, 1.2], damageMultiplier: [1.3, 1.45, 1.6, 1.7, 1.8] },
   cycle: { interval: [3, 2.8, 2.5, 2.2, 2], splashDamage: [0.08, 0.11, 0.14, 0.17, 0.20], lightningDamage: [0.10, 0.13, 0.16, 0.19, 0.22], damageMultiplier: [1.2, 1.25, 1.3, 1.4, 1.5] },
-  expert: { perAverageLevel: [0.03, 0.05, 0.07, 0.096, 0.12] },
-  echo: { radius: [15, 20, 26, 30, 35], duration: [3, 4, 6, 7, 8], damage: [0.02, 0.028, 0.035, 0.042, 0.05] },
+  expert: {
+    avgLv1: [1.05, 1.07, 1.10, 1.12, 1.15],
+    avgLv3: [1.10, 1.18, 1.25, 1.32, 1.38],
+    avgLv5: [1.15, 1.25, 1.35, 1.48, 1.60]
+  },
+  echo: { radius: [30, 38, 46, 54, 62], duration: [3, 4, 6, 7, 8], damage: [0.04, 0.06, 0.08, 0.10, 0.12] },
   lastHit: { fixedBonus: [8, 12, 16, 20, 25], hpDivisor: [25, 20, 16, 13, 10] },
   scoreBoost: { multiplier: [1.2, 1.35, 1.5, 1.63, 1.75] },
   vampire: { percent: [0.02, 0.03, 0.035, 0.04, 0.05] },
@@ -172,6 +179,15 @@ const SKILLS = {
     color: "#ffcc4a",
     maxLevel: 5,
     description: "3ヒットごとに範囲爆発を起こす"
+  },
+  shatter: {
+    id: "shatter",
+    name: "SHATTER",
+    type: "ball",
+    category: "attack",
+    color: "#ff5f88",
+    maxLevel: 5,
+    description: "Low HP blocks near a destroyed block take follow-up damage."
   },
   poison: {
     id: "poison",
@@ -482,6 +498,15 @@ function skillDamageByMaxHp(block, skillId, level, key = "damage") {
   return Math.max(1, Math.round((block ? block.maxHp : 1) * ratio));
 }
 
+function getExpertMultiplier(level, averageLevel) {
+  const average = clamp(Number(averageLevel) || 1, 1, 5);
+  const low = skillParam("expert", level, "avgLv1", 1);
+  const mid = skillParam("expert", level, "avgLv3", low);
+  const high = skillParam("expert", level, "avgLv5", mid);
+  if (average <= 3) return low + ((average - 1) / 2) * (mid - low);
+  return mid + ((average - 3) / 2) * (high - mid);
+}
+
 function getTotalStars(entity) {
   if (!entity || !entity.skills) return 0;
   return entity.skills.reduce((sum, skill) => sum + skill.level, 0);
@@ -585,14 +610,20 @@ function generateSkillChoices(balls, paddle, bumper) {
     return canEquipSkill(paddle, id);
   };
 
-  const ids = Object.keys(SKILLS).filter(isChoiceAvailable);
+  const getCandidateIds = () => Object.keys(SKILLS).filter((id) => {
+    if (!isChoiceAvailable(id)) return false;
+    const skill = SKILLS[id];
+    return skill.type !== "bumper" || Math.random() < BUMPER_SKILL_CHOICE_RATE;
+  });
+
+  const ids = getCandidateIds();
 
   for (const id of shuffle(ids)) {
     if (choices.length >= 3) break;
     pushUniqueChoice(SKILLS[id]);
   }
 
-  const fallbackIds = shuffle(Object.keys(SKILLS).filter(isChoiceAvailable));
+  const fallbackIds = shuffle(getCandidateIds());
   for (const id of fallbackIds) {
     if (choices.length >= 3) break;
     pushUniqueChoice(SKILLS[id]);

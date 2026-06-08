@@ -12,6 +12,7 @@ const SLOT_SKILL_LABELS = {
   overload: "OVERLOAD",
   fragment: "FRAG",
   detonator: "DETONATE",
+  shatter: "SHATTER",
   poison: "POISON",
   afterburn: "BURN",
   lightning: "LIGHTNING",
@@ -299,7 +300,7 @@ const UI = {
       if (bumper && bumper.syncStats) bumper.syncStats();
       const firstBumper = bumper && bumper.skills ? bumper.skills[0] : null;
       const level = bumper ? (bumper.level || 0) : 0;
-      const owned = level > 0;
+      const owned = bumper && bumper.isOwned ? bumper.isOwned() : level > 0;
       const maxHp = owned && bumper ? bumper.maxHp : 0;
       const hp = owned && bumper ? bumper.hp : 0;
       const broken = owned && bumper ? bumper.broken : false;
@@ -322,13 +323,14 @@ const UI = {
         bumperSlot.innerHTML = `
           <div class="slot-bumper-icon empty"></div>
           <span class="slot-tag">BUMPER</span>
-          <span class="slot-name">LOCKED</span>
+          <span class="slot-name">${buyState.label}</span>
+          <span class="slot-lv">${buyState.detail}</span>
         `;
       } else {
-        // 所有済み: アイコン + BUMPER + HPドット + スキル名
         const compactDots = Array.from({ length: Math.max(1, maxHp) }, (_, index) => (
           `<span class="${index < hp && !broken ? "on" : ""}"></span>`
         )).join("");
+        // 所有済み: アイコン + BUMPER + HPドット + スキル名
         bumperSlot.innerHTML = `
           <div class="slot-bumper-icon"></div>
           <span class="slot-tag">BUMPER</span>
@@ -357,7 +359,10 @@ const UI = {
     const nextBallNumber = balls.length + 1;
     const cost = getBallPurchaseCost(ballNumber);
     const price = Number.isFinite(cost) ? `PRICE ${formatNumber(cost)}T` : "MAX";
-    const bumperBonus = ballNumber >= 2 ? `<span class="slot-lock">+ BUMPER LV ${ballNumber - 1}</span>` : "";
+    const bumperUnlocked = typeof Game !== "undefined" && Game.bumper && Game.bumper.unlocked;
+    const bumperBonus = ballNumber >= 2
+      ? `<span class="slot-lock">${bumperUnlocked ? `+ BUMPER LV ${Math.min(ballNumber, BALL_MAX - 1)}` : `BUMPER ${formatNumber(BUMPER_UNLOCK_COST)}T`}</span>`
+      : "";
     if (!this.canBuyBallInCurrentPhase()) {
       return { label: "EMPTY", detail: "NO SKILL", buyable: false, locked: false };
     }
@@ -402,18 +407,22 @@ const UI = {
   },
 
   canBuyBumperInCurrentPhase() {
-    return false;
+    return typeof currentState !== "undefined" &&
+      (currentState === STATE.SKILL_SELECT || currentState === STATE.UPGRADE);
   },
 
   getBumperSlotState(bumper) {
     const level = bumper ? (bumper.level || 0) : 0;
+    const unlocked = bumper && bumper.unlocked;
     const autoMax = BALL_MAX - 1;
-    if (level <= 0) {
+    if (!unlocked) {
+      const canBuy = this.canBuyBumperInCurrentPhase();
+      const price = formatNumber(BUMPER_UNLOCK_COST);
       return {
-        label: "LOCKED",
-        detail: "ADD BALL 2",
-        buyable: false,
-        locked: true
+        label: canBuy ? `BUY ${price}T` : "LOCKED",
+        detail: `<span class="slot-price">PRICE ${price}T</span>`,
+        buyable: canBuy,
+        locked: !canBuy
       };
     }
     return {
@@ -426,11 +435,30 @@ const UI = {
 
   handleBumperSlotClick(bumper) {
     if (!bumper) return;
+    if (!bumper.unlocked) {
+      if (this.canBuyBumperInCurrentPhase()) this.confirmBumperPurchase(bumper);
+      else this.showBumperDetail(bumper);
+      return;
+    }
     this.showBumperDetail(bumper);
   },
 
   confirmBumperPurchase(bumper) {
-    this.showToast("BUMPER UNLOCKS WITH BALLS");
+    if (!bumper || bumper.unlocked) {
+      this.showToast("BUMPER ALREADY UNLOCKED");
+      return;
+    }
+    if (Game.tokens < BUMPER_UNLOCK_COST) {
+      this.showToast(`NEED ${formatNumber(BUMPER_UNLOCK_COST)} TOKENS`);
+      return;
+    }
+    const cost = formatNumber(BUMPER_UNLOCK_COST);
+    this.showConfirm({
+      title: "UNLOCK BUMPER",
+      message: `Use ${cost} tokens?`,
+      confirmLabel: "UNLOCK",
+      onConfirm: () => Game.buyBumperLevelWithTokens()
+    });
   },
 
   slotSkillChip(skill, index = 0) {
@@ -468,6 +496,8 @@ const UI = {
       return `${Number.isInteger(value) ? value : Number(value).toFixed(1).replace(/\.0$/, "")}${suffix}`;
     };
     const v = (key, fallback = 0) => skillParam(id, level, key, fallback);
+    if (id === "expert") return `AVG1 ${n(v("avgLv1"))}x / AVG3 ${n(v("avgLv3"))}x / AVG5 ${n(v("avgLv5"))}x`;
+    if (id === "shatter") return `HP<=${p(v("threshold"))} / R${v("radius")} / HP${p(v("damage"))}`;
     switch (id) {
       case "penetration": return `${level}枚まで貫通`;
       case "splash": return `半径${v("radius")} / HP${p(v("damage"))}`;
@@ -494,7 +524,6 @@ const UI = {
       case "aura": return `半径${v("radius")} / 0.1秒毎HP${p(v("damage"))}`;
       case "berserker": return `${v("duration")}秒 / 速度${n(v("speedMultiplier"))}倍 / 火力${n(v("damageMultiplier"))}倍`;
       case "cycle": return `${v("interval")}秒ごと / 最大火力${n(v("damageMultiplier"))}倍`;
-      case "expert": return `平均Lvごと+${p(v("perAverageLevel"))}`;
       case "echo": return `半径${v("radius")} / ${v("duration")}秒 / HP${p(v("damage"))}`;
       case "lastHit": return `撃破+${v("fixedBonus")} + HP/${v("hpDivisor")}`;
       case "scoreBoost": return `撃破スコア${n(v("multiplier"))}倍`;
@@ -866,6 +895,16 @@ const UI = {
         }
       });
     });
+    list.querySelectorAll(".btn-bumper-buy").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (Game.buyBumperLevelWithTokens()) {
+          AudioSystem.playUiSuccess();
+          this.renderUpgradePanel();
+          this.flashUpgradeList("upgrade-success");
+          this.renderSlots(Game.balls, Game.paddle);
+        }
+      });
+    });
     list.querySelectorAll(".upgrade-target-choice").forEach((button) => {
       button.addEventListener("click", () => {
         const type = button.dataset.type;
@@ -941,12 +980,13 @@ const UI = {
     const bumper = typeof Game !== "undefined" ? Game.bumper : null;
     const color = bumper && bumper.skills && bumper.skills[0] ? bumper.skills[0].color : "#67d8ff";
     const level = bumper ? (bumper.level || 0) : 0;
+    const unlocked = bumper && bumper.unlocked;
     return {
       title: "BUMPER",
       color,
       icon: `<span class="target-avatar bumper-avatar"></span>`,
-      status: `AUTO LV ${level}/${BALL_MAX - 1}`,
-      power: level > 0 && bumper ? `HP ${Math.ceil(bumper.hp)} / ${Math.ceil(bumper.maxHp)}` : "ADD BALL TO UNLOCK",
+      status: unlocked ? `AUTO LV ${level}/${BALL_MAX - 1}` : "LOCKED",
+      power: unlocked && level > 0 && bumper ? `HP ${Math.ceil(bumper.hp)} / ${Math.ceil(bumper.maxHp)}` : `UNLOCK ${formatNumber(BUMPER_UNLOCK_COST)}T`,
       skills: this.targetSkillListHtml(bumper)
     };
   },
@@ -967,6 +1007,8 @@ const UI = {
     }
     const paddleSelected = target.type === "paddle";
     const bumperSelected = target.type === "bumper";
+    const bumperUnlocked = Game.bumper && Game.bumper.unlocked;
+    const bumperLevel = Game.bumper ? (Game.bumper.level || 0) : 0;
     choices.push(`
       <button class="upgrade-target-choice wide ${paddleSelected ? "selected" : ""}" type="button" data-type="paddle" style="--target-color:#f6fbff">
         <span class="upgrade-target-choice-paddle"></span>
@@ -978,7 +1020,7 @@ const UI = {
       <button class="upgrade-target-choice wide ${bumperSelected ? "selected" : ""}" type="button" data-type="bumper" style="--target-color:#67d8ff">
         <span class="upgrade-target-choice-bumper"></span>
         <span class="upgrade-target-choice-label">BUMPER</span>
-        <span class="upgrade-target-choice-state">AUTO ${Game.bumper ? (Game.bumper.level || 0) : 0}/${BALL_MAX - 1}</span>
+        <span class="upgrade-target-choice-state">${bumperUnlocked ? `AUTO ${bumperLevel}/${BALL_MAX - 1}` : `${formatNumber(BUMPER_UNLOCK_COST)}T`}</span>
       </button>
     `);
     return `<div class="upgrade-target-strip">${choices.join("")}</div>`;
@@ -1061,12 +1103,45 @@ const UI = {
 
   upgradeBumperHtml(bumper) {
     const level = bumper ? (bumper.level || 0) : 0;
+    const unlocked = bumper && bumper.unlocked;
     const autoMax = BALL_MAX - 1;
     const ballCount = typeof Game !== "undefined" && Game.balls ? Game.balls.length : 1;
     const nextBall = Math.min(BALL_MAX, level + 2);
     const hp = bumper ? `${Math.ceil(bumper.hp)} / ${Math.ceil(bumper.maxHp)}` : "0 / 0";
     const levelFill = autoMax > 0 ? Math.min(100, (level / autoMax) * 100) : 100;
     const skills = this.upgradeSkillListHtml(bumper);
+    if (!unlocked) {
+      const canBuy = Game.tokens >= BUMPER_UNLOCK_COST;
+      return `
+        <section class="upgrade-ball upgrade-target">
+          <div class="upgrade-ball-title">
+            <span class="slot-bumper-icon empty"></span>
+            <span>BUMPER</span>
+          </div>
+          <div class="upgrade-row">
+            <div>
+              <div class="upgrade-name">UNLOCK</div>
+              <div class="upgrade-gauge">REQUIRES ${formatNumber(BUMPER_UNLOCK_COST)}T</div>
+              <div class="upgrade-meter" style="--fill:${Math.min(100, (Game.tokens / BUMPER_UNLOCK_COST) * 100)}%"></div>
+            </div>
+            <div class="upgrade-actions">
+              <span class="upgrade-cost">${formatNumber(BUMPER_UNLOCK_COST)}</span>
+              <button class="btn-buy btn-bumper-buy" type="button" ${canBuy ? "" : "disabled"}>BUY</button>
+            </div>
+          </div>
+          <div class="upgrade-row">
+            <div>
+              <div class="upgrade-name">AUTO LINK</div>
+              <div class="upgrade-gauge">LOCKED</div>
+            </div>
+            <div class="upgrade-actions">
+              <span class="upgrade-value">OFF</span>
+            </div>
+          </div>
+          <div class="upgrade-skill-box"><span class="upgrade-skill-empty">UNLOCK FIRST</span></div>
+        </section>
+      `;
+    }
     return `
       <section class="upgrade-ball upgrade-target">
         <div class="upgrade-ball-title">
@@ -1086,7 +1161,7 @@ const UI = {
         <div class="upgrade-row">
           <div>
             <div class="upgrade-name">HP</div>
-            <div class="upgrade-gauge">${level > 0 ? hp : "ADD BALL 2"}</div>
+            <div class="upgrade-gauge">${level > 0 ? hp : "UNLOCK FIRST"}</div>
           </div>
           <div class="upgrade-actions">
             <span class="upgrade-value">${level > 0 ? hp : "NONE"}</span>
@@ -1193,8 +1268,8 @@ const UI = {
     const skills = bumper.skills.length
       ? bumper.skills.map((skill) => `${skill.name} Lv${skill.level}`).join(" / ")
       : "バンパースキルなし";
-    if ((bumper.level || 0) <= 0) {
-      this.showToast("BUMPER Lv 0: ADD BALL TO UNLOCK");
+    if (!bumper.unlocked || (bumper.level || 0) <= 0) {
+      this.showToast(`BUMPER LOCKED: BUY ${formatNumber(BUMPER_UNLOCK_COST)}T`);
       return;
     }
     this.showToast(`BUMPER Lv ${bumper.level} HP ${bumper.hp}/${bumper.maxHp}: AUTO FROM BALLS / ${skills}`);
@@ -1219,8 +1294,8 @@ const UI = {
     const skills = bumper.skills.length
       ? bumper.skills.map((skill) => `${this.skillDisplayName(skill)} ★${skill.level}`).join(" / ")
       : "NO SKILL";
-    if ((bumper.level || 0) <= 0) {
-      this.showToast("BUMPER Lv 0: ADD BALL TO UNLOCK");
+    if (!bumper.unlocked || (bumper.level || 0) <= 0) {
+      this.showToast(`BUMPER LOCKED: BUY ${formatNumber(BUMPER_UNLOCK_COST)}T`);
       return;
     }
     this.showToast(`BUMPER Lv ${bumper.level} HP ${bumper.hp}/${bumper.maxHp}: AUTO FROM BALLS / ${skills}`);

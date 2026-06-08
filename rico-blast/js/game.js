@@ -18,6 +18,9 @@ const Game = {
   rewardPending: false,
   tokenGainAmount: 0,
   tokenGainTimeout: null,
+  scoreGainAmount: 0,
+  scoreGainTimeout: null,
+  scoreGainBoosted: false,
   lastReadyLaunchAt: 0,
   lastTime: 0,
   playTime: 0,
@@ -52,13 +55,22 @@ const Game = {
     this.skillSelections = 0;
     this.rewardPending = false;
     this.tokenGainAmount = 0;
+    this.scoreGainAmount = 0;
+    this.scoreGainBoosted = false;
     this.lastReadyLaunchAt = 0;
     clearTimeout(this.tokenGainTimeout);
     this.tokenGainTimeout = null;
+    clearTimeout(this.scoreGainTimeout);
+    this.scoreGainTimeout = null;
     const tokenGainNode = document.getElementById("token-gain-text");
     if (tokenGainNode) {
       tokenGainNode.textContent = "+0 TOKEN";
       tokenGainNode.classList.remove("active");
+    }
+    const scoreGainNode = document.getElementById("score-gain-text");
+    if (scoreGainNode) {
+      scoreGainNode.textContent = "+0";
+      scoreGainNode.classList.remove("active", "boosted");
     }
     const hpTokenNode = document.getElementById("hp-token-count");
     if (hpTokenNode) hpTokenNode.textContent = "0";
@@ -108,7 +120,7 @@ const Game = {
     this.canvas.height = bitmapHeight;
     this.ctx.setTransform(bitmapWidth / this.width, 0, 0, bitmapHeight / this.height, 0, 0);
     if (this.paddle) {
-      this.paddle.y = this.height - 28;
+      this.paddle.y = this.paddle.getY(this.height);
       this.paddle.targetX = clamp(this.paddle.targetX || this.width / 2, 0, this.width);
       this.paddle.x = clamp(this.paddle.x, 0, Math.max(0, this.width - this.paddle.getWidth()));
     }
@@ -275,7 +287,8 @@ const Game = {
   },
 
   getAutoBumperLevel() {
-    return clamp(this.balls.length - 1, 0, BALL_MAX - 1);
+    if (!this.bumper || !this.bumper.unlocked) return 0;
+    return clamp(this.balls.length, 1, BALL_MAX - 1);
   },
 
   syncBumperFromBalls(playEffect = false) {
@@ -348,18 +361,83 @@ const Game = {
     return this.getBlockStartY() + rowIndex * this.getBlockRowPitch(layout) + this.blockGridOffset;
   },
 
+  getBlockHeightForSpan(spanRows = 1, layout = this.getBlockLayout()) {
+    const span = Math.max(1, Math.floor(spanRows || 1));
+    return layout.blockHeight + (span - 1) * this.getBlockRowPitch(layout);
+  },
+
+  getBlockTopY(rowIndex, spanRows = 1, layout = this.getBlockLayout()) {
+    return this.getBlockY(rowIndex, layout) - (Math.max(1, spanRows || 1) - 1) * this.getBlockRowPitch(layout);
+  },
+
+  getBlockOccupiedRows(block) {
+    const span = Math.max(1, block.gridSpanRows || 1);
+    const bottomRow = Number.isFinite(block.gridRow) ? block.gridRow : 0;
+    return {
+      start: bottomRow - span + 1,
+      end: bottomRow
+    };
+  },
+
+  isBlockCellOccupied(rowIndex, col, exceptBlock = null) {
+    return this.blocks.some((block) => {
+      if (block === exceptBlock || block.gridCol !== col) return false;
+      const rows = this.getBlockOccupiedRows(block);
+      return rowIndex >= rows.start && rowIndex <= rows.end;
+    });
+  },
+
+  canPlaceBlockAt(rowIndex, col, type = "stone") {
+    const definition = Block.types[type] || Block.types.stone;
+    const span = Math.max(1, definition.gridSpanRows || 1);
+    for (let row = rowIndex - span + 1; row <= rowIndex; row += 1) {
+      if (this.isBlockCellOccupied(row, col)) return false;
+    }
+    return true;
+  },
+
   spawnBlockRow(rowIndex, layout = this.getBlockLayout()) {
     const hp = this.getBaseBlockHp(this.difficultyLevel);
     const speed = this.getBlockDescendSpeed();
-    const y = this.getBlockY(rowIndex, layout);
     for (let col = 0; col < layout.cols; col += 1) {
+      if (this.isBlockCellOccupied(rowIndex, col)) continue;
       const x = layout.padding + col * (layout.blockWidth + layout.gap);
-      const block = new Block(x, y, hp, this.pickBlockType(rowIndex, col), layout.blockWidth, layout.blockHeight, speed);
-      block.gridRow = rowIndex;
-      block.gridCol = col;
-      this.blocks.push(block);
+      let type = this.pickBlockType(rowIndex, col);
+      if (!this.canPlaceBlockAt(rowIndex, col, type)) type = "stone";
+      this.createBlockAt(rowIndex, col, type, hp, layout, speed, x);
     }
     this.blockRowsSpawned += 1;
+  },
+
+  createBlockAt(rowIndex, col, type = "stone", hp = this.getBaseBlockHp(this.difficultyLevel), layout = this.getBlockLayout(), speed = this.getBlockDescendSpeed(), x = null) {
+    const definition = Block.types[type] || Block.types.stone;
+    const span = Math.max(1, definition.gridSpanRows || 1);
+    const blockX = Number.isFinite(x) ? x : layout.padding + col * (layout.blockWidth + layout.gap);
+    const blockY = this.getBlockTopY(rowIndex, span, layout);
+    const blockHeight = this.getBlockHeightForSpan(span, layout);
+    const block = new Block(blockX, blockY, hp, type, layout.blockWidth, blockHeight, speed);
+    block.gridRow = rowIndex;
+    block.gridCol = col;
+    block.gridSpanRows = span;
+    this.blocks.push(block);
+    return block;
+  },
+
+  spawnNormalBlockNear(sourceBlock) {
+    if (!sourceBlock) return false;
+    const layout = this.getBlockLayout();
+    const options = [
+      { row: sourceBlock.gridRow, col: sourceBlock.gridCol - 1 },
+      { row: sourceBlock.gridRow, col: sourceBlock.gridCol + 1 },
+      { row: sourceBlock.gridRow - 1, col: sourceBlock.gridCol },
+      { row: sourceBlock.gridRow + 1, col: sourceBlock.gridCol }
+    ].filter((cell) => cell.col >= 0 && cell.col < layout.cols && this.canPlaceBlockAt(cell.row, cell.col, "stone"));
+    if (options.length === 0) return false;
+    const cell = options[randomInt(0, options.length - 1)];
+    const block = this.createBlockAt(cell.row, cell.col, "stone", this.getBaseBlockHp(this.difficultyLevel), layout);
+    Effects.spawnImpactSpark(block.cx, block.cy, "#aa66ff");
+    Effects.showPopup("SPAWN", block.cx, block.cy - 12, "#aa66ff");
+    return true;
   },
 
   syncBlockGridPositions() {
@@ -367,15 +445,47 @@ const Game = {
     for (const block of this.blocks) {
       const col = Number.isFinite(block.gridCol) ? block.gridCol : 0;
       const row = Number.isFinite(block.gridRow) ? block.gridRow : 0;
+      const span = Math.max(1, block.gridSpanRows || 1);
       block.width = layout.blockWidth;
-      block.height = layout.blockHeight;
+      block.height = this.getBlockHeightForSpan(span, layout);
       block.x = layout.padding + col * (layout.blockWidth + layout.gap);
-      block.y = this.getBlockY(row, layout);
+      block.y = this.getBlockTopY(row, span, layout) + (block.extraY || 0);
     }
   },
 
   pickBlockType(rowIndex, col) {
-    if (Math.random() < 0.8) return "stone";
+    const specialRate = this.getSpecialBlockRate();
+    if (Math.random() < specialRate) return this.pickNewSpecialBlockType();
+    if (Math.random() < 0.12) {
+      const types = Block.coloredTypes || ["row", "chain", "tokens", "burst", "column", "aqua"];
+      return types[randomInt(0, types.length - 1)];
+    }
+    return "stone";
+  },
+
+  getSpecialBlockRate() {
+    return clamp(0.15 + Math.max(0, this.difficultyLevel - 1) * 0.005, 0.15, 0.20);
+  },
+
+  pickNewSpecialBlockType() {
+    const weighted = [
+      ["dive", 13],
+      ["heavy", 1.4],
+      ["armor", 1.4],
+      ["regen", 1.4],
+      ["exploder", 1.4],
+      ["spawner", 1.4]
+    ];
+    const total = weighted.reduce((sum, [, weight]) => sum + weight, 0);
+    let roll = Math.random() * total;
+    for (const [type, weight] of weighted) {
+      roll -= weight;
+      if (roll <= 0) return type;
+    }
+    return "dive";
+  },
+
+  pickColoredBlockType() {
     const types = Block.coloredTypes || ["row", "chain", "tokens", "burst", "column", "aqua"];
     return types[randomInt(0, types.length - 1)];
   },
@@ -456,7 +566,7 @@ const Game = {
   },
 
   getBlockDescendSpeed() {
-    return 0.08;
+    return 0.09;
   },
 
   updateBlockGrid(dt) {
@@ -490,7 +600,7 @@ const Game = {
 
   getTopmostBlockRow() {
     if (this.blocks.length === 0) return null;
-    return this.blocks.reduce((top, block) => Math.min(top, block.gridRow), Infinity);
+    return this.blocks.reduce((top, block) => Math.min(top, this.getBlockOccupiedRows(block).start), Infinity);
   },
 
   getMaxActiveBlocks() {
@@ -526,7 +636,12 @@ const Game = {
       if (!this.blocks.includes(block)) continue;
       const damage = Math.max(1, Math.ceil(block.hp));
       this.blocks.splice(this.blocks.indexOf(block), 1);
-      Effects.spawnBlockBreak(block.cx, block.cy, block.colorSet ? block.colorSet.body : "#ff4a4a");
+      this.triggerDiveBlocksAbove(block);
+      Effects.spawnBlockBreak(block.cx, block.cy, block.colorSet ? block.colorSet.body : "#ff4a4a", {
+        special: block.isSpecial,
+        combo: this.combo,
+        effect: block.effect
+      });
       this.damagePaddle(damage, block);
       if (this.paddle.hp <= 0) break;
     }
@@ -687,9 +802,19 @@ const Game = {
     return ball ? ball.paddlelessHits : 0;
   },
 
-  damageBlock(block, amount, sourceBall, source = "hit", depth = 0) {
+  getBlockDamageAmount(block, amount, source = "hit", options = {}) {
+    let damage = Math.max(0, Number(amount) || 0);
+    if (block && block.effect === "armor") {
+      const topHit = source === "ball" && options.collision && options.collision.normalY < 0;
+      if (!topHit) damage *= 0.3;
+    }
+    return damage;
+  },
+
+  damageBlock(block, amount, sourceBall, source = "hit", depth = 0, options = {}) {
     if (!this.blocks.includes(block) || block.hp <= 0) return false;
-    const displayedDamage = Math.max(0, amount);
+    const appliedDamage = this.getBlockDamageAmount(block, amount, source, options);
+    const displayedDamage = Math.max(0, appliedDamage);
     if (displayedDamage > 0) {
       Effects.showDamageNumber(
         block.cx,
@@ -699,7 +824,7 @@ const Game = {
         source
       );
     }
-    const destroyed = block.takeDamage(amount);
+    const destroyed = block.takeDamage(appliedDamage);
     if (destroyed) {
       this.destroyBlock(block, sourceBall, source, depth);
       return true;
@@ -714,6 +839,7 @@ const Game = {
       splash: "#ffe66b",
       chain: "#ffe66b",
       sniper: "#ff5f88",
+      shatter: "#ff5f88",
       lightning: "#67d8ff",
       detonator: "#ffb15c",
       projectile: "#f6fbff",
@@ -734,8 +860,14 @@ const Game = {
     const index = this.blocks.indexOf(block);
     if (index < 0) return;
     this.blocks.splice(index, 1);
+    this.triggerDiveBlocksAbove(block);
     const color = block.colorSet ? block.colorSet.body : (block.isSpecial ? "#ffcc4a" : "#4a9eff");
-    Effects.spawnBlockBreak(block.cx, block.cy, color);
+    Effects.spawnBlockBreak(block.cx, block.cy, color, {
+      special: block.isSpecial,
+      combo: this.combo,
+      effect: block.effect,
+      source
+    });
     AudioSystem.playBlockBreak(block.isSpecial, this.combo, block.effect);
     if (block.isSpecial) Effects.shakeScreen(3, 0.2);
     const lastHit = sourceBall ? getSkillLevel(sourceBall, "lastHit") : 0;
@@ -759,6 +891,21 @@ const Game = {
     this.triggerBlockEffect(block, sourceBall, source, depth);
     if (sourceBall) this.triggerDestroySkills(block, sourceBall, depth);
     this.recordBlockDestroyed();
+  },
+
+  triggerDiveBlocksAbove(destroyedBlock) {
+    if (!destroyedBlock) return;
+    const destroyedRows = this.getBlockOccupiedRows(destroyedBlock);
+    const rowPitch = this.getBlockRowPitch();
+    for (const block of this.blocks) {
+      if (block.effect !== "dive" || block.gridCol !== destroyedBlock.gridCol) continue;
+      const rows = this.getBlockOccupiedRows(block);
+      if (rows.end !== destroyedRows.start - 1) continue;
+      if (block.startDive(rowPitch)) {
+        Effects.showPopup("DIVE", block.cx, block.cy, "#f6fbff");
+        Effects.spawnImpactSpark(block.cx, block.cy, "#f6fbff");
+      }
+    }
   },
 
   recordBlockDestroyed() {
@@ -839,6 +986,25 @@ const Game = {
 
     if (block.effect === "tokens") {
       Effects.spawnTokenCollect(block.cx, block.cy, 3);
+      return;
+    }
+
+    if (block.effect === "healBurst") {
+      this.addZone({
+        kind: "healBurst",
+        x: block.cx,
+        y: block.cy,
+        radius: 100,
+        life: 0.45,
+        maxLife: 0.45,
+        color: "#7cf5b2",
+        sourceBall
+      });
+      for (const target of this.blocks) {
+        if (distance(block.cx, block.cy, target.cx, target.cy) > 100) continue;
+        target.heal(target.maxHp * 0.3);
+        Effects.showPopup("HEAL", target.cx, target.cy - 10, "#7cf5b2");
+      }
       return;
     }
 
@@ -933,6 +1099,18 @@ const Game = {
         const angle = rand(0, Math.PI * 2);
         this.spawnProjectile(block.cx, block.cy, Math.cos(angle), Math.sin(angle), 5.5, damage, ball, SKILLS.fragment.color, 0, true);
       }
+    }
+
+    const shatter = getSkillLevel(ball, "shatter");
+    if (shatter > 0) {
+      const radius = skillParam("shatter", shatter, "radius", 80);
+      const threshold = skillParam("shatter", shatter, "threshold", 0.15);
+      const damage = (target) => skillDamageByMaxHp(target, "shatter", shatter);
+      const targets = this.blocks
+        .filter((target) => target.hp / Math.max(1, target.maxHp) <= threshold)
+        .filter((target) => distance(block.cx, block.cy, target.cx, target.cy) <= radius)
+        .sort((a, b) => distance(block.cx, block.cy, a.cx, a.cy) - distance(block.cx, block.cy, b.cx, b.cy));
+      for (const target of targets) this.damageBlock(target, damage, ball, "shatter", depth + 1);
     }
 
     const lightning = Math.max(getSkillLevel(ball, "lightning"), ball.cycleEffect === "lightning" ? 1 : 0);
@@ -1035,6 +1213,7 @@ const Game = {
       vy: (dy / length) * speed,
       radius: 3,
       damage,
+      damageLeft: 0,
       sourceBall,
       color,
       pierce,
@@ -1057,12 +1236,18 @@ const Game = {
         if (projectile.hitIds.has(block.id)) continue;
         if (!circleRectHit(projectile.x, projectile.y, projectile.radius, block.collisionRect)) continue;
         projectile.hitIds.add(block.id);
-        const damage = typeof projectile.damage === "function" ? projectile.damage(block) : projectile.damage;
-        this.damageBlock(block, damage, projectile.sourceBall, "projectile", 1);
-        Effects.spawnBlockBreak(projectile.x, projectile.y, projectile.color);
+        const damage = projectile.damageLeft > 0
+          ? projectile.damageLeft
+          : (typeof projectile.damage === "function" ? projectile.damage(block) : projectile.damage);
+        const hpBefore = Math.max(0, block.hp);
+        const appliedDamage = this.getBlockDamageAmount(block, damage, "projectile");
+        const destroyed = this.damageBlock(block, damage, projectile.sourceBall, "projectile", 1);
+        const overflowDamage = destroyed ? Math.max(0, appliedDamage - hpBefore) : 0;
+        Effects.spawnImpactSpark(projectile.x, projectile.y, projectile.color);
         AudioSystem.playBlockHit(this.combo);
-        if (projectile.pierce > 0) {
+        if (projectile.pierce > 0 && overflowDamage > 0) {
           projectile.pierce -= 1;
+          projectile.damageLeft = overflowDamage;
         } else {
           this.removeProjectile(projectile);
         }
@@ -1127,6 +1312,13 @@ const Game = {
         ctx.fillRect(0, zone.y - zone.height / 2, zone.width, zone.height);
       } else if (zone.kind === "column") {
         ctx.fillRect(zone.x - zone.width / 2, 0, zone.width, zone.height);
+      } else if (zone.kind === "healBurst") {
+        const progress = 1 - alpha;
+        ctx.globalAlpha = alpha * 0.85;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(zone.x, zone.y, zone.radius * progress, 0, Math.PI * 2);
+        ctx.stroke();
       } else {
         ctx.beginPath();
         ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
@@ -1182,9 +1374,7 @@ const Game = {
   addScore(points, x = null, y = null, multiplier = 1) {
     const gained = Math.max(0, Math.floor(points));
     this.score += gained;
-    if (gained > 0 && Number.isFinite(x) && Number.isFinite(y)) {
-      Effects.showScoreNumber(x, y, gained, multiplier);
-    }
+    if (gained > 0) this.showScoreGain(gained, multiplier);
     const hud = document.getElementById("hud-score");
     if (hud) {
       hud.textContent = formatNumber(this.score);
@@ -1198,6 +1388,38 @@ const Game = {
         stat.classList.add("score-pop");
       }
     }
+  },
+
+  getScoreGainNode() {
+    const root = document.getElementById("hud-score-block");
+    if (!root) return null;
+    let node = document.getElementById("score-gain-text");
+    if (!node) {
+      node = document.createElement("span");
+      node.id = "score-gain-text";
+      node.setAttribute("aria-hidden", "true");
+      root.appendChild(node);
+    }
+    return node;
+  },
+
+  showScoreGain(amount, multiplier = 1) {
+    this.scoreGainAmount += Math.max(0, Math.floor(amount));
+    this.scoreGainBoosted = this.scoreGainBoosted || (multiplier || 1) > 1.001;
+    const node = this.getScoreGainNode();
+    if (!node) return;
+    node.textContent = `+${formatNumber(this.scoreGainAmount)}`;
+    node.classList.toggle("boosted", this.scoreGainBoosted);
+    node.classList.remove("active");
+    void node.offsetWidth;
+    node.classList.add("active");
+    clearTimeout(this.scoreGainTimeout);
+    this.scoreGainTimeout = setTimeout(() => {
+      this.scoreGainAmount = 0;
+      this.scoreGainBoosted = false;
+      const currentNode = document.getElementById("score-gain-text");
+      if (currentNode) currentNode.classList.remove("active", "boosted");
+    }, 720);
   },
 
   addTokens(amount) {
@@ -1294,8 +1516,28 @@ const Game = {
   },
 
   buyBumperLevelWithTokens() {
-    UI.showToast("BUMPER UNLOCKS WITH BALLS");
-    return false;
+    if (!this.bumper) this.bumper = new Bumper();
+    if (this.bumper.unlocked) {
+      UI.showToast("BUMPER ALREADY UNLOCKED");
+      return false;
+    }
+    const cost = BUMPER_UNLOCK_COST;
+    if (this.tokens < cost) {
+      UI.showToast(`NEED ${formatNumber(cost)} TOKENS`);
+      return false;
+    }
+    this.tokens -= cost;
+    this.bumper.unlocked = true;
+    this.syncBumperFromBalls(true);
+    AudioSystem.playToken();
+    this.updateHud();
+    UI.updateSkillRerollStatus();
+    UI.renderSlots(this.balls, this.paddle);
+    if (currentState === STATE.UPGRADE) {
+      this.showUpgradeScreen();
+      if (UI.flashUpgradeList) UI.flashUpgradeList("upgrade-success");
+    }
+    return true;
   },
 
   showUpgradeScreen() {
