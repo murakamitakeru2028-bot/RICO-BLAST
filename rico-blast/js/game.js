@@ -15,6 +15,7 @@ const Game = {
   blocksTowardSkill: 0,
   totalBlocksDestroyed: 0,
   skillSelections: 0,
+  skillRerollCount: 0,
   rewardPending: false,
   tokenGainAmount: 0,
   tokenGainTimeout: null,
@@ -53,6 +54,7 @@ const Game = {
     this.blocksTowardSkill = 0;
     this.totalBlocksDestroyed = 0;
     this.skillSelections = 0;
+    this.skillRerollCount = 0;
     this.rewardPending = false;
     this.tokenGainAmount = 0;
     this.scoreGainAmount = 0;
@@ -324,9 +326,7 @@ const Game = {
     const startRow = -1;
     const rows = 5;
     const endRow = startRow + rows - 1;
-    for (let row = endRow; row >= startRow; row -= 1) {
-      this.spawnBlockRow(row, layout, { minRow: startRow, maxRow: endRow });
-    }
+    this.spawnBlockBand(startRow, endRow, layout);
   },
 
   getBlockLayout() {
@@ -490,16 +490,30 @@ const Game = {
     });
   },
 
-  spawnBlockRow(rowIndex, layout = this.getBlockLayout(), bounds = {}) {
+  getBlockSpawnBandRows() {
+    return Object.values(Block.types || {}).reduce((maxRows, definition) => {
+      return Math.max(maxRows, Math.max(1, definition.gridSpanRows || 1));
+    }, 1);
+  },
+
+  spawnBlockBand(startRow, endRow, layout = this.getBlockLayout()) {
+    const bounds = { minRow: startRow, maxRow: endRow };
+    const occupancy = this.buildBlockOccupancy();
+    for (let row = endRow; row >= startRow; row -= 1) {
+      this.spawnBlockRow(row, layout, bounds, occupancy);
+    }
+  },
+
+  spawnBlockRow(rowIndex, layout = this.getBlockLayout(), bounds = {}, occupancy = null) {
     const hp = this.getBaseBlockHp(this.difficultyLevel);
     const speed = this.getBlockDescendSpeed();
-    const occupancy = this.buildBlockOccupancy();
+    const rowOccupancy = occupancy || this.buildBlockOccupancy();
     for (let col = 0; col < layout.cols; col += 1) {
-      if (this.isBlockCellOccupied(rowIndex, col, null, occupancy)) continue;
+      if (this.isBlockCellOccupied(rowIndex, col, null, rowOccupancy)) continue;
       const x = layout.padding + col * (layout.blockWidth + layout.gap);
-      const type = this.pickPlaceableBlockType(rowIndex, col, layout, bounds, occupancy);
+      const type = this.pickPlaceableBlockType(rowIndex, col, layout, bounds, rowOccupancy);
       const block = this.createBlockAt(rowIndex, col, type, hp, layout, speed, x);
-      this.markBlockInOccupancy(block, occupancy);
+      this.markBlockInOccupancy(block, rowOccupancy);
     }
     this.blockRowsSpawned += 1;
   },
@@ -750,7 +764,9 @@ const Game = {
   },
 
   getBlockDescendSpeed() {
-    return 0.09;
+    const wave = Math.max(1, this.difficultyLevel || 1);
+    const ramp = Math.min(0.012, Math.max(0, wave - 4) * 0.00075);
+    return 0.09 + ramp;
   },
 
   updateBlockGrid(dt) {
@@ -771,7 +787,9 @@ const Game = {
       }
       const topY = this.getBlockY(topRow, layout);
       if (topY < this.getBlockStartY() + pitch * this.getBlockSpawnLeadRatio()) break;
-      this.spawnBlockRow(topRow - 1, layout);
+      const endRow = topRow - 1;
+      const startRow = endRow - this.getBlockSpawnBandRows() + 1;
+      this.spawnBlockBand(startRow, endRow, layout);
       guard += 1;
     }
     this.syncBlockGridPositions();
@@ -797,7 +815,10 @@ const Game = {
 
   getBaseBlockHp(level = 1) {
     const step = Math.max(0, level - 1);
-    return Math.floor(100 * Math.pow(1.18, step));
+    const wave = Math.max(1, level);
+    const midWaveRamp = Math.max(0, wave - 12) * 0.012;
+    const lateWaveRamp = Math.max(0, wave - 24) * 0.015;
+    return Math.floor(100 * Math.pow(1.21, step) * (1 + midWaveRamp + lateWaveRamp));
   },
 
   getPaddleMaxHp() {
@@ -1368,14 +1389,18 @@ const Game = {
   },
 
   applyAreaDamage(x, y, radius, damage, sourceBall, excludedBlock, source = "area", depth = 0) {
+    let hitCount = 0;
     for (const block of [...this.blocks]) {
       if (excludedBlock && block.id === excludedBlock.id) continue;
       const reach = radius + Math.max(block.width, block.height) * 0.5;
       if (distance(x, y, block.cx, block.cy) <= reach) {
         const amount = typeof damage === "function" ? damage(block) : damage;
-        this.damageBlock(block, amount, sourceBall, source, depth);
+        const hpBefore = block.hp;
+        const destroyed = this.damageBlock(block, amount, sourceBall, source, depth);
+        if (destroyed || block.hp < hpBefore) hitCount += 1;
       }
     }
+    return hitCount;
   },
 
   applyLineDamage(y, height, damage, sourceBall, source = "line", depth = 0) {
@@ -1396,7 +1421,7 @@ const Game = {
     }
   },
 
-  spawnProjectile(x, y, targetX, targetY, speed, damage, sourceBall, color, pierce = 0, isDirection = false) {
+  spawnProjectile(x, y, targetX, targetY, speed, damage, sourceBall, color, pierce = 0, isDirection = false, options = {}) {
     let dx;
     let dy;
     if (isDirection) {
@@ -1407,18 +1432,28 @@ const Game = {
       dy = targetY - y;
     }
     const length = Math.hypot(dx, dy) || 1;
+    const life = Number.isFinite(options.life) ? Math.max(0.05, options.life) : 3;
     this.projectiles.push({
       x,
       y,
       vx: (dx / length) * speed,
       vy: (dy / length) * speed,
-      radius: 3,
+      radius: Math.max(1, options.radius || 3),
       damage,
       damageLeft: 0,
       sourceBall,
       color,
+      coreColor: options.coreColor || color,
+      alpha: Number.isFinite(options.alpha) ? options.alpha : 0.85,
+      kind: options.kind || "projectile",
       pierce,
-      life: 3,
+      life,
+      maxLife: life,
+      maxHits: Number.isFinite(options.maxHits) ? Math.max(1, Math.floor(options.maxHits)) : Infinity,
+      hits: 0,
+      bounceWalls: Boolean(options.bounceWalls),
+      bounceBlocks: Boolean(options.bounceBlocks),
+      hitSource: options.hitSource || "projectile",
       hitIds: new Set()
     });
   },
@@ -1427,26 +1462,45 @@ const Game = {
     const frame = dt * 60;
     for (const projectile of [...this.projectiles]) {
       projectile.life -= dt;
+      const prevX = projectile.x;
+      const prevY = projectile.y;
       projectile.x += projectile.vx * frame;
       projectile.y += projectile.vy * frame;
-      if (projectile.life <= 0 || projectile.x < -20 || projectile.x > this.width + 20 || projectile.y < -20 || projectile.y > this.height + 20) {
+      if (projectile.bounceWalls) this.resolveProjectileWallBounce(projectile);
+      const escaped = projectile.bounceWalls
+        ? projectile.y - projectile.radius > this.height + 20
+        : projectile.x < -20 || projectile.x > this.width + 20 || projectile.y < -20 || projectile.y > this.height + 20;
+      if (projectile.life <= 0 || escaped) {
         this.removeProjectile(projectile);
         continue;
       }
       for (const block of [...this.blocks]) {
         if (projectile.hitIds.has(block.id)) continue;
-        if (!circleRectHit(projectile.x, projectile.y, projectile.radius, block.collisionRect)) continue;
+        const collision = projectile.bounceBlocks
+          ? getCircleRectCollision(prevX, prevY, projectile.x, projectile.y, projectile.radius, block.collisionRect)
+          : (circleRectHit(projectile.x, projectile.y, projectile.radius, block.collisionRect) ? { normalX: 0, normalY: 0 } : null);
+        if (!collision) continue;
         projectile.hitIds.add(block.id);
         const damage = projectile.damageLeft > 0
           ? projectile.damageLeft
           : (typeof projectile.damage === "function" ? projectile.damage(block) : projectile.damage);
         const hpBefore = Math.max(0, block.hp);
-        const appliedDamage = this.getBlockDamageAmount(block, damage, "projectile");
-        const destroyed = this.damageBlock(block, damage, projectile.sourceBall, "projectile", 1);
+        const hitSource = projectile.hitSource || "projectile";
+        const damageOptions = { collision };
+        const appliedDamage = this.getBlockDamageAmount(block, damage, hitSource, damageOptions);
+        const destroyed = this.damageBlock(block, damage, projectile.sourceBall, hitSource, 1, damageOptions);
         const overflowDamage = destroyed ? Math.max(0, appliedDamage - hpBefore) : 0;
         Effects.spawnImpactSpark(projectile.x, projectile.y, projectile.color);
         AudioSystem.playBlockHit(this.combo);
-        if (projectile.pierce > 0 && overflowDamage > 0) {
+        projectile.hits += 1;
+        if (projectile.bounceBlocks) {
+          if (projectile.hits >= projectile.maxHits) {
+            this.removeProjectile(projectile);
+          } else {
+            this.reflectProjectileFromBlock(projectile, block, collision);
+            projectile.damageLeft = 0;
+          }
+        } else if (projectile.pierce > 0 && overflowDamage > 0) {
           projectile.pierce -= 1;
           projectile.damageLeft = overflowDamage;
         } else {
@@ -1457,18 +1511,106 @@ const Game = {
     }
   },
 
+  resolveProjectileWallBounce(projectile) {
+    const radius = projectile.radius || 1;
+    if (projectile.x - radius <= 0) {
+      projectile.x = radius;
+      projectile.vx = Math.abs(projectile.vx || 1);
+    } else if (projectile.x + radius >= this.width) {
+      projectile.x = this.width - radius;
+      projectile.vx = -Math.abs(projectile.vx || 1);
+    }
+    if (projectile.y - radius <= 0) {
+      projectile.y = radius;
+      projectile.vy = Math.abs(projectile.vy || 1);
+    }
+  },
+
+  reflectProjectileFromBlock(projectile, block, collision = null) {
+    let normalX = collision ? collision.normalX : 0;
+    let normalY = collision ? collision.normalY : 0;
+    if (!normalX && !normalY) {
+      const dx = projectile.x - block.cx;
+      const dy = projectile.y - block.cy;
+      const nx = Math.abs(dx / Math.max(1, block.width / 2));
+      const ny = Math.abs(dy / Math.max(1, block.height / 2));
+      if (nx > ny) normalX = dx < 0 ? -1 : 1;
+      else normalY = dy < 0 ? -1 : 1;
+    }
+
+    const radius = projectile.radius || 1;
+    const rect = block.collisionRect;
+    if (normalX < 0) projectile.x = rect.x - radius - 0.5;
+    else if (normalX > 0) projectile.x = rect.x + rect.width + radius + 0.5;
+    if (normalY < 0) projectile.y = rect.y - radius - 0.5;
+    else if (normalY > 0) projectile.y = rect.y + rect.height + radius + 0.5;
+
+    const speed = Math.hypot(projectile.vx, projectile.vy) || 1;
+    const dot = projectile.vx * normalX + projectile.vy * normalY;
+    if (dot < 0) {
+      projectile.vx -= 2 * dot * normalX;
+      projectile.vy -= 2 * dot * normalY;
+    } else if (normalX !== 0) {
+      projectile.vx = normalX < 0 ? -Math.abs(projectile.vx || 1) : Math.abs(projectile.vx || 1);
+    } else {
+      projectile.vy = normalY < 0 ? -Math.abs(projectile.vy || 1) : Math.abs(projectile.vy || 1);
+    }
+    const nextSpeed = Math.hypot(projectile.vx, projectile.vy) || 1;
+    projectile.vx = (projectile.vx / nextSpeed) * speed;
+    projectile.vy = (projectile.vy / nextSpeed) * speed;
+  },
+
   drawProjectiles(ctx) {
     for (const projectile of this.projectiles) {
       ctx.save();
-      ctx.strokeStyle = projectile.color;
-      ctx.fillStyle = projectile.color;
-      ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.85;
-      ctx.beginPath();
-      ctx.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
-      ctx.fill();
+      if (projectile.kind === "mirror") {
+        this.drawMirrorProjectile(ctx, projectile);
+      } else {
+        ctx.strokeStyle = projectile.color;
+        ctx.fillStyle = projectile.color;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = projectile.alpha;
+        ctx.beginPath();
+        ctx.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     }
+  },
+
+  drawMirrorProjectile(ctx, projectile) {
+    const radius = projectile.radius;
+    const lifeRatio = clamp(projectile.life / Math.max(0.01, projectile.maxLife || projectile.life || 1), 0, 1);
+    const alpha = clamp(projectile.alpha || 0.32, 0.08, 0.5) * (0.28 + lifeRatio * 0.72);
+    const mirrorColor = projectile.color || "#aa66ff";
+    const coreColor = projectile.coreColor || mirrorColor;
+
+    ctx.globalCompositeOperation = "lighter";
+
+    const gradient = ctx.createRadialGradient(projectile.x, projectile.y, 0, projectile.x, projectile.y, radius * 1.2);
+    gradient.addColorStop(0, coreColor);
+    gradient.addColorStop(0.58, mirrorColor);
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(projectile.x, projectile.y, radius * 1.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = alpha * 0.95;
+    ctx.strokeStyle = mirrorColor;
+    ctx.lineWidth = 1.35;
+    ctx.beginPath();
+    ctx.arc(projectile.x, projectile.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.globalAlpha = alpha * 0.65;
+    ctx.strokeStyle = "rgba(246,251,255,0.92)";
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.arc(projectile.x, projectile.y, radius * 0.52, -0.75, Math.PI * 0.75);
+    ctx.stroke();
   },
 
   removeProjectile(projectile) {
@@ -1484,10 +1626,12 @@ const Game = {
     for (const zone of [...this.zones]) {
       zone.life -= dt;
       if (zone.kind === "afterburn" || zone.kind === "echo") {
+        if (zone.kind === "echo") zone.visibleTimer = Math.max(0, (zone.visibleTimer || 0) - dt);
         zone.tickTimer -= dt;
         if (zone.tickTimer <= 0) {
           zone.tickTimer = zone.tick;
-          this.applyAreaDamage(zone.x, zone.y, zone.radius, zone.damage, zone.sourceBall, null, zone.kind, 1);
+          const hitCount = this.applyAreaDamage(zone.x, zone.y, zone.radius, zone.damage, zone.sourceBall, null, zone.kind, 1);
+          if (zone.kind === "echo") zone.visibleTimer = hitCount > 0 ? zone.tick + 0.04 : 0;
         }
       }
       if (zone.kind === "afterburn") {
@@ -1506,27 +1650,97 @@ const Game = {
     for (const zone of this.zones) {
       const alpha = clamp(zone.life / zone.maxLife, 0, 1);
       ctx.save();
-      ctx.globalAlpha = alpha * 0.35;
-      ctx.fillStyle = zone.color;
-      ctx.strokeStyle = zone.color;
-      if (zone.kind === "blast") {
-        ctx.fillRect(0, zone.y - zone.height / 2, zone.width, zone.height);
-      } else if (zone.kind === "column") {
-        ctx.fillRect(zone.x - zone.width / 2, 0, zone.width, zone.height);
-      } else if (zone.kind === "healBurst") {
-        const progress = 1 - alpha;
-        ctx.globalAlpha = alpha * 0.85;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(zone.x, zone.y, zone.radius * progress, 0, Math.PI * 2);
-        ctx.stroke();
+      if (zone.kind === "echo") {
+        if ((zone.visibleTimer || 0) <= 0) {
+          ctx.restore();
+          continue;
+        }
+        this.drawEchoHitZone(ctx, zone, alpha);
+      } else if (zone.kind === "auraPulse") {
+        this.drawAuraPulseZone(ctx, zone, alpha);
       } else {
-        ctx.beginPath();
-        ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.globalAlpha = alpha * 0.35;
+        ctx.fillStyle = zone.color;
+        ctx.strokeStyle = zone.color;
+        if (zone.kind === "blast") {
+          ctx.fillRect(0, zone.y - zone.height / 2, zone.width, zone.height);
+        } else if (zone.kind === "column") {
+          ctx.fillRect(zone.x - zone.width / 2, 0, zone.width, zone.height);
+        } else if (zone.kind === "healBurst") {
+          const progress = 1 - alpha;
+          ctx.globalAlpha = alpha * 0.85;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(zone.x, zone.y, zone.radius * progress, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       ctx.restore();
     }
+  },
+
+  drawEchoHitZone(ctx, zone, alpha) {
+    const visibleAlpha = clamp((zone.visibleTimer || 0) / Math.max(0.01, (zone.tick || 0.2) + 0.04), 0, 1);
+    const fade = Math.pow(alpha * visibleAlpha, 1.2);
+    const progress = 1 - visibleAlpha;
+    const ringRadius = zone.radius * (0.62 + progress * 0.28);
+    const edgeColor = "#9ffbf2";
+    const coreColor = "#ffffff";
+
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = zone.color;
+    ctx.globalAlpha = fade * 0.055;
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = edgeColor;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = fade * 0.34;
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, ringRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = coreColor;
+    ctx.lineWidth = 0.9;
+    ctx.globalAlpha = fade * 0.22;
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, ringRadius * 0.68, 0, Math.PI * 2);
+    ctx.stroke();
+  },
+
+  drawAuraPulseZone(ctx, zone, alpha) {
+    const fade = Math.pow(alpha, 1.35);
+    const progress = 1 - alpha;
+    const intensity = clamp(0.75 + (zone.hitCount || 1) * 0.08, 0.75, 1.15);
+    const pulseRadius = zone.radius * (0.58 + progress * 0.36);
+    const edgeColor = "#9ffbf2";
+    const coreColor = "#ffffff";
+
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = zone.color;
+    ctx.globalAlpha = fade * 0.035 * intensity;
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = edgeColor;
+    ctx.lineWidth = 1.8;
+    ctx.globalAlpha = fade * 0.34 * intensity;
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, pulseRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = coreColor;
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = fade * 0.22 * intensity;
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, pulseRadius * 0.72, -0.35, Math.PI * 0.85);
+    ctx.stroke();
   },
 
   removeZone(zone) {
@@ -1558,11 +1772,18 @@ const Game = {
     return this.blocks.reduce((best, block) => (!best || block.hp > best.hp ? block : best), null);
   },
 
-  findDenseBlockAnchor() {
-    if (this.blocks.length === 0) return null;
-    let best = this.blocks[0];
+  getTeleporterMaxY() {
+    const paddleLimit = this.paddle ? this.paddle.y - 150 : this.height - 190;
+    const stageLimit = this.height * 0.58;
+    return clamp(Math.min(stageLimit, paddleLimit), 96, Math.max(96, this.height - 150));
+  },
+
+  findDenseBlockAnchor(maxY = Infinity) {
+    const candidates = this.blocks.filter((block) => block.y <= maxY);
+    if (candidates.length === 0) return null;
+    let best = candidates[0];
     let bestScore = -1;
-    for (const block of this.blocks) {
+    for (const block of candidates) {
       const nearby = this.blocks.filter((other) => distance(block.cx, block.cy, other.cx, other.cy) < 90).length;
       if (nearby > bestScore) {
         best = block;
@@ -1764,6 +1985,8 @@ const Game = {
       return;
     }
     if (target && target.isBumper && target.syncStats) target.syncStats();
+    this.rewardPending = false;
+    this.updateHud();
     UI.renderSlots(this.balls, this.paddle);
     setState(STATE.UPGRADE);
     this.showUpgradeScreen();
@@ -1786,8 +2009,16 @@ const Game = {
 
   updateHud() {
     const scoreNode = document.getElementById("hud-score");
-    if (!scoreNode) return;
-    scoreNode.textContent = formatNumber(this.score);
+    if (scoreNode) scoreNode.textContent = formatNumber(this.score);
+    const skillProgress = document.getElementById("hud-skill-progress");
+    if (skillProgress) {
+      const goal = Math.max(1, Math.floor(this.blocksPerSkill || 1));
+      const current = this.rewardPending ? goal : clamp(Math.floor(this.blocksTowardSkill || 0), 0, goal);
+      const percent = clamp((current / goal) * 100, 0, 100);
+      skillProgress.style.setProperty("--skill-progress-fill", `${percent}%`);
+      skillProgress.classList.toggle("ready", current >= goal || this.rewardPending);
+      skillProgress.setAttribute("aria-label", `SKILL ${current} / ${goal}`);
+    }
     const hpToken = document.getElementById("hp-token-count");
     if (hpToken) hpToken.textContent = formatNumber(this.tokens);
     const pauseButton = document.getElementById("btn-pause");

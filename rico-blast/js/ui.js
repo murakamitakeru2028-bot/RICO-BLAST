@@ -60,7 +60,7 @@ const SKILL_DETAIL_TEXT = {
   impact: "パドル後の初撃が大きく強化される。狙った一発で高HPブロックを割りやすい。",
   crash: "ボール速度が高いほどダメージが増える。速度アップ系と組み合わせると伸びる。",
   blast: "破壊時に横長の衝撃波を出す。横列のHPをまとめて削り、穴を広げやすい。",
-  mirror: "反対軌道へ分身弾を周期的に出す。★が高いほど発射間隔が短く追撃が増える。",
+  mirror: "パドル反射時に対称方向へ短時間ミラーボールを飛ばす。★が高いほど長く残り、追撃が強くなる。",
   rebound: "パドルで打ち返すたび次のヒットが強化される。守りながら火力を溜められる。",
   echo: "移動軌道に残像ダメージを残す。★が高いほど残像が太く長く残り、通路を削る。",
   phantom: "落下時に直前の軌道から残像弾を撃つ。★が高いほど往復数と追撃火力が増える。",
@@ -85,6 +85,7 @@ const UI = {
   selectedUpgradeTarget: null,
   selectedSkillTarget: null,
   upgradeContext: null,
+  onSkillTargetChanged: null,
 
   handlePlayingUiLaunch(ball = null) {
     if (typeof Game === "undefined" || typeof currentState === "undefined" || currentState !== STATE.PLAYING) {
@@ -184,16 +185,39 @@ const UI = {
     this.updatePaddleHp(paddle);
     const isUpgrade = typeof currentState !== "undefined" && currentState === STATE.UPGRADE;
     const isSkillSelect = typeof currentState !== "undefined" && currentState === STATE.SKILL_SELECT;
+    const slotBar = document.getElementById("slot-bar");
+    if (slotBar) slotBar.classList.toggle("skill-select-mode", isSkillSelect);
     for (let i = 0; i < BALL_MAX; i += 1) {
       const slot = document.getElementById(`slot-${i}`);
       const ball = balls[i];
       if (!ball) {
         const buyState = this.getBallPurchaseSlotState(i, balls);
-        slot.className = `slot empty ${buyState.buyable ? "buyable" : ""} ${buyState.locked ? "locked" : ""}`;
+        const isStoreSlot = this.canBuyBallInCurrentPhase();
+        slot.className = `slot empty ${isStoreSlot ? "store-empty" : ""} ${buyState.buyable ? "buyable" : ""} ${buyState.locked ? "locked" : ""}`;
         slot.style.borderColor = "";
         slot.style.removeProperty("--selected-color");
         slot.style.removeProperty("--primary-skill-color");
         slot.style.removeProperty("--revive-fill");
+        if (isStoreSlot) {
+          const cost = Number.isFinite(buyState.cost) ? `${formatNumber(buyState.cost)}T` : "MAX";
+          const state = buyState.buyable ? "BUY" : (buyState.locked ? "LOCKED" : "MAX");
+          slot.innerHTML = `
+            <div class="slot-buy-card">
+              <div class="slot-buy-icon">+</div>
+              <div class="slot-buy-copy">
+                <div class="slot-tag">BALL ${i + 1}</div>
+                <div class="slot-buy-price">${cost}</div>
+              </div>
+            </div>
+            <div class="slot-buy-state">${state}</div>
+            <div class="slot-buy-note">${buyState.shortDetail || ""}</div>
+          `;
+          slot.onclick = () => {
+            if (this.handlePlayingUiLaunch()) return;
+            this.handleEmptyBallSlotClick(i);
+          };
+          continue;
+        }
         const emptyRows = `
           <div class="skill-row empty"><span class="skill-row-name">------</span></div>
           <div class="skill-row empty"><span class="skill-row-name">------</span></div>
@@ -275,7 +299,7 @@ const UI = {
     const paddleSlot = document.getElementById("slot-paddle");
     const firstPaddle = paddle.skills[0];
     const total = Math.min(5, getTotalStars(paddle));
-    const paddleSelected = isUpgrade && this.isUpgradeTargetSelected("paddle");
+    const paddleSelected = false;
     paddleSlot.className = `slot ${paddle.skills.length ? "has-skills" : "empty"} ${paddleSelected ? "selected-upgrade" : ""}`;
     paddleSlot.style.borderColor = "";
     paddleSlot.style.setProperty("--selected-color", firstPaddle ? firstPaddle.color : "#f6fbff");
@@ -288,7 +312,7 @@ const UI = {
     paddleSlot.onclick = () => {
       if (this.handlePlayingUiLaunch()) return;
       if (isUpgrade) {
-        this.selectUpgradeTarget("paddle");
+        this.showPaddleDetail(paddle);
         return;
       }
       this.showPaddleDetail(paddle);
@@ -314,7 +338,7 @@ const UI = {
       const dots = Array.from({ length: Math.max(1, maxHp) }, (_, index) => (
         `<span class="${owned && index < hp && !broken ? "on" : ""}"></span>`
       )).join("");
-      const bumperSelected = isUpgrade && this.isUpgradeTargetSelected("bumper");
+      const bumperSelected = false;
       bumperSlot.className = `slot ${owned ? "has-skills" : ""} ${broken ? "fallen" : ""} ${buyState.buyable ? "buyable" : ""} ${buyState.locked ? "locked" : ""} ${bumperSelected ? "selected-upgrade" : ""}`;
       bumperSlot.style.borderColor = "";
       bumperSlot.style.setProperty("--selected-color", firstBumper ? firstBumper.color : "#67d8ff");
@@ -341,7 +365,7 @@ const UI = {
       bumperSlot.onclick = () => {
         if (this.handlePlayingUiLaunch()) return;
         if (isUpgrade) {
-          this.selectUpgradeTarget("bumper");
+          this.handleBumperSlotClick(bumper);
           return;
         }
         this.handleBumperSlotClick(bumper);
@@ -364,21 +388,25 @@ const UI = {
       ? `<span class="slot-lock">${bumperUnlocked ? `+ BUMPER LV ${Math.min(ballNumber, BALL_MAX - 1)}` : `BUMPER ${formatNumber(BUMPER_UNLOCK_COST)}T`}</span>`
       : "";
     if (!this.canBuyBallInCurrentPhase()) {
-      return { label: "EMPTY", detail: "NO SKILL", buyable: false, locked: false };
+      return { label: "EMPTY", detail: "NO SKILL", shortDetail: "NO SKILL", buyable: false, locked: false, cost };
     }
     if (ballNumber !== nextBallNumber) {
       return {
         label: "LOCKED",
         detail: `<span class="slot-price">${price}</span><span class="slot-lock">BALL ${nextBallNumber} FIRST</span>${bumperBonus}`,
+        shortDetail: `BALL ${nextBallNumber} FIRST`,
         buyable: false,
-        locked: true
+        locked: true,
+        cost
       };
     }
     return {
       label: `BUY ${formatNumber(cost)}T`,
       detail: `<span class="slot-price">${price}</span><span class="slot-lock">BALL ${ballNumber}</span>${bumperBonus}`,
+      shortDetail: "AVAILABLE",
       buyable: Number.isFinite(cost),
-      locked: false
+      locked: false,
+      cost
     };
   },
 
@@ -518,10 +546,10 @@ const UI = {
       case "sprint": return `${n(v("duration"), "秒")} / 速度${n(v("speedMultiplier"))}倍`;
       case "teleporter": return `${p(v("chance"))}でワープ`;
       case "immortality": return `${v("saves")}回復帰 / ${n(v("boostMultiplier"))}倍${n(v("boostDuration"), "秒")}`;
-      case "mirror": return `${n(v("interval"), "秒")}毎 / HP${p(v("damage"))}`;
+      case "mirror": return `BOUNCE ${n(v("duration"), "s")} / HP${p(v("damage"))}`;
       case "rebound": return `打ち返し後${n(v("multiplier"))}倍`;
       case "phantom": return `${v("count")}発 / HP${p(v("damage"))}`;
-      case "aura": return `半径${v("radius")} / 0.1秒毎HP${p(v("damage"))}`;
+      case "aura": return `半径${v("radius")} / 0.1秒毎攻撃力${p(v("damage"))}`;
       case "berserker": return `${v("duration")}秒 / 速度${n(v("speedMultiplier"))}倍 / 火力${n(v("damageMultiplier"))}倍`;
       case "cycle": return `${v("interval")}秒ごと / 最大火力${n(v("damageMultiplier"))}倍`;
       case "echo": return `半径${v("radius")} / ${v("duration")}秒 / HP${p(v("damage"))}`;
@@ -572,43 +600,47 @@ const UI = {
     const picker = document.getElementById("ball-picker");
     const rerollRow = document.getElementById("skill-reroll-row");
     let lastChoiceKey = "";
+    let currentChoices = [];
     this.prepareSkillTarget(balls);
     this.renderSlots(balls, Game.paddle);
     this.clearSlotTargets();
-    picker.innerHTML = "";
+    this.renderSkillTargetSelector(balls);
 
     const makeChoiceKey = (choices) => choices.map((choice) => choice.id).sort().join("|");
     const rollChoices = () => {
-      let choices = generateSkillChoices(balls, Game.paddle, Game.bumper);
+      const selectedBall = this.getSelectedSkillBall(balls);
+      let choices = generateSkillChoices(balls, Game.paddle, Game.bumper, selectedBall ? selectedBall.ball : null);
       for (let attempt = 0; attempt < 8 && lastChoiceKey; attempt += 1) {
         if (makeChoiceKey(choices) !== lastChoiceKey) break;
-        choices = generateSkillChoices(balls, Game.paddle, Game.bumper);
+        choices = generateSkillChoices(balls, Game.paddle, Game.bumper, selectedBall ? selectedBall.ball : null);
       }
       lastChoiceKey = makeChoiceKey(choices);
       return choices;
     };
 
-    const renderChoices = () => {
+    const renderChoices = (animate = false) => {
       this.clearSlotTargets();
       this.renderSlots(balls, Game.paddle);
-      picker.innerHTML = "";
+      this.renderSkillTargetSelector(balls);
       const cost = getSkillRerollCost();
-      const choices = rollChoices();
+      const choices = currentChoices;
       if (rerollRow) {
         const disabled = Game.tokens < cost;
         rerollRow.innerHTML = `
           <div class="skill-reroll-status"><span>TOKENS</span><b>${formatNumber(Game.tokens)}</b></div>
           <button id="btn-skill-reroll" class="btn-reroll" type="button" ${disabled ? "disabled" : ""}>
-            REROLL <span>${cost}</span>
+            REROLL <span>${formatNumber(cost)}</span>
           </button>
         `;
         this.updateSkillRerollStatus();
       }
       cards.innerHTML = choices.map((choice) => this.skillCardHtml(choice)).join("");
-      cards.classList.remove("rerolled");
-      void cards.offsetWidth;
-      cards.classList.add("rerolled");
-      setTimeout(() => cards.classList.remove("rerolled"), 320);
+      if (animate) {
+        cards.classList.remove("rerolled");
+        void cards.offsetWidth;
+        cards.classList.add("rerolled");
+        setTimeout(() => cards.classList.remove("rerolled"), 320);
+      }
 
       [...cards.querySelectorAll(".skill-card")].forEach((card, index) => {
         const choice = choices[index];
@@ -652,14 +684,20 @@ const UI = {
             return;
           }
           Game.tokens -= cost;
+          Game.skillRerollCount = Math.max(0, Math.floor(Game.skillRerollCount || 0)) + 1;
           Game.updateHud();
           AudioSystem.playUiOpen();
-          renderChoices();
+          currentChoices = rollChoices();
+          renderChoices(true);
         });
       }
     };
 
-    renderChoices();
+    this.onSkillTargetChanged = () => {
+      renderChoices(false);
+    };
+    currentChoices = rollChoices();
+    renderChoices(true);
   },
 
   updateSkillRerollStatus() {
@@ -667,17 +705,28 @@ const UI = {
     const tokenValue = document.querySelector(".skill-reroll-status b");
     if (!rerollButton || !tokenValue || typeof Game === "undefined") return;
     const cost = getSkillRerollCost();
+    const costValue = rerollButton.querySelector("span");
     tokenValue.textContent = formatNumber(Game.tokens);
+    if (costValue) costValue.textContent = formatNumber(cost);
     rerollButton.disabled = Game.tokens < cost;
+  },
+
+  skillStarLevelHtml(level, max = 5) {
+    const safeMax = Math.max(1, Math.floor(max || 5));
+    const current = clamp(Math.floor(level || 0), 0, safeMax);
+    const stars = Array.from({ length: safeMax }, (_, index) => {
+      const filled = index < current;
+      return `<span class="skill-star ${filled ? "filled" : "empty"}">${filled ? "★" : "☆"}</span>`;
+    }).join("");
+    return `<span class="skill-stars" aria-label="LEVEL ${current} OF ${safeMax}">${stars}</span>`;
   },
 
   skillCardHtml(choice) {
     const isAdd = choice.type === "addBall";
     const description = this.skillDescription(choice);
     const level = clamp(choice.level || 1, 1, 5);
-    const currentText = isAdd ? "新しいボールを追加して同時攻撃数を増やす" : this.skillLevelText(choice, level);
-    const maxText = isAdd ? `最大${BALL_MAX}個まで所持可能` : this.skillLevelText(choice, 5);
     const category = isAdd ? "NEW BALL" : choice.category.toUpperCase();
+    const levelBadge = isAdd ? `<span class="skill-stars skill-stars-empty">NEW</span>` : this.skillStarLevelHtml(level);
     return `
       <button class="skill-card ${isAdd ? "add-ball" : ""}" style="--skill-color:${choice.color}" type="button">
         <span class="skill-card-head">
@@ -687,28 +736,24 @@ const UI = {
         <span class="skill-copy">
           <span class="skill-name-row">
             <span class="skill-name">${choice.name}</span>
-            <span class="skill-stars">${makeStars(level)}</span>
+            ${levelBadge}
           </span>
           <span class="skill-description">${description}</span>
-          <span class="skill-effect-lines">
-            <span><b>効果</b><em>${currentText}</em></span>
-            <span><b>★5</b><em>${maxText}</em></span>
-          </span>
         </span>
       </button>
     `;
   },
 
   showBallPicker(choice, balls, onSelect) {
-    const picker = document.getElementById("ball-picker");
     this.clearSlotTargets();
-    picker.innerHTML = this.skillTargetPickerHtml(choice, balls);
+    this.renderSkillTargetSelector(balls, choice, onSelect);
     balls.forEach((ball, index) => {
       const slot = document.getElementById(`slot-${index}`);
       if (!slot) return;
       const canEquip = canEquipSkill(ball, choice.id);
       slot.style.setProperty("--target-color", choice.color || "#ffe66b");
       slot.classList.add(canEquip ? "targetable" : "disabled-target");
+      if (this.isSkillTargetSelected(index)) slot.classList.add("selected-skill");
       slot.onclick = () => {
         if (!canEquip) {
           this.showToast("THIS BALL IS FULL");
@@ -717,28 +762,31 @@ const UI = {
         onSelect(choice, ball, index);
       };
     });
-    picker.querySelectorAll(".ball-target").forEach((button) => {
-      button.addEventListener("click", () => {
-        const index = Number(button.dataset.ball);
-        const ball = balls[index];
-        if (!ball || !canEquipSkill(ball, choice.id)) {
-          this.showToast("THIS BALL IS FULL");
-          return;
-        }
-        onSelect(choice, ball, index);
-      });
-    });
+  },
+
+  renderSkillTargetSelector(balls, choice = null, onSelect = null) {
+    const picker = document.getElementById("ball-picker");
+    if (!picker) return;
+    picker.innerHTML = "";
   },
 
   skillTargetPickerHtml(choice, balls) {
+    const target = this.getSelectedSkillBall(balls);
+    const targetBall = target ? target.ball : balls[0];
+    const targetIndex = target ? target.index : 0;
+    const targetColor = choice ? (choice.color || "#ffffff") : (targetBall ? ((targetBall.skills[0] ? targetBall.skills[0].color : targetBall.color) || "#ffffff") : "#ffffff");
+    const title = choice ? choice.name : "SELECT TARGET";
+    const modeLabel = choice ? "APPLY SKILL TO" : "CURRENT TARGET";
+    const selectedSkills = targetBall ? this.targetSkillListHtml(targetBall) : `<span class="target-skill-empty">EMPTY</span>`;
     const options = balls.map((ball, index) => {
-      const canEquip = canEquipSkill(ball, choice.id);
+      const canEquip = choice ? canEquipSkill(ball, choice.id) : true;
       const first = ball.skills[0];
       const color = first ? first.color : ball.color;
       const skills = this.targetSkillListHtml(ball);
       const slotCount = `${ball.skills.length}/3`;
+      const selected = index === targetIndex;
       return `
-        <button class="ball-target ${canEquip ? "" : "disabled"}" type="button" data-ball="${index}" style="--ball-color:${color || "#ffffff"};--target-color:${choice.color || "#ffffff"}" ${canEquip ? "" : "disabled"}>
+        <button class="ball-target ${selected ? "selected" : ""} ${canEquip ? "" : "disabled"}" type="button" data-ball="${index}" style="--ball-color:${color || "#ffffff"};--target-color:${targetColor}" ${canEquip ? "" : "disabled"}>
           <span class="ball-target-head">
             <span class="ball-target-icon" style="${this.ballIconStyle(ball)}"></span>
             <span class="ball-target-copy">
@@ -747,21 +795,22 @@ const UI = {
             </span>
           </span>
           <span class="ball-target-skills">${skills}</span>
-          <span class="ball-target-state">${canEquip ? "APPLY" : "FULL"}</span>
+          <span class="ball-target-state">${selected ? "SELECTED" : (canEquip ? (choice ? "APPLY" : "SELECT") : "FULL")}</span>
         </button>
       `;
     }).join("");
     return `
-      <div class="target-panel skill-target-panel" style="--target-color:${choice.color || "#ffffff"}">
+      <div class="target-panel skill-target-panel ${choice ? "choosing-skill" : "idle-target"}" style="--target-color:${targetColor}">
         <div class="target-panel-main">
-          <span class="target-avatar" style="background:${choice.color || "#ffffff"}"></span>
+          <span class="target-avatar" style="${targetBall ? this.ballIconStyle(targetBall) : `background:${targetColor}`}"></span>
           <span class="target-copy">
-            <span class="target-kicker">TARGET BALL</span>
-            <span class="target-title">${choice.name}</span>
+            <span class="target-kicker">${modeLabel}</span>
+            <span class="target-title">${targetBall ? `BALL ${targetIndex + 1}` : title}</span>
+            <span class="target-selected-skills">${selectedSkills}</span>
           </span>
-          <span class="target-level-pill">${makeStars(choice.level || 1)}</span>
+          <span class="target-selected-pill">${choice ? "CHOOSE" : `${targetBall ? targetBall.skills.length : 0}/3 SLOT`}</span>
         </div>
-        <div class="skill-target-grid" style="--target-count:${Math.max(1, Math.min(3, balls.length))}">${options}</div>
+        <div class="skill-target-grid" style="--target-count:${Math.max(1, Math.min(4, balls.length))}">${options}</div>
       </div>
     `;
   },
@@ -811,7 +860,8 @@ const UI = {
       this.selectedSkillTarget = { type: "ball", index: this.selectedUpgradeTarget.index };
       return;
     }
-    this.selectedSkillTarget = balls.length === 1 ? { type: "ball", index: 0 } : null;
+    const firstBallIndex = balls.findIndex(Boolean);
+    this.selectedSkillTarget = firstBallIndex >= 0 ? { type: "ball", index: firstBallIndex } : null;
   },
 
   getSelectedSkillBall(balls) {
@@ -828,35 +878,38 @@ const UI = {
       return;
     }
     this.selectedSkillTarget = { type: "ball", index };
-    const picker = document.getElementById("ball-picker");
-    if (picker) picker.innerHTML = "";
     AudioSystem.playUiOpen();
+    if (typeof this.onSkillTargetChanged === "function") {
+      this.onSkillTargetChanged();
+      return;
+    }
     this.renderSlots(Game.balls, Game.paddle);
+    this.renderSkillTargetSelector(Game.balls);
   },
 
   normalizeUpgradeTarget(balls) {
     const target = this.selectedUpgradeTarget;
-    if (target) {
-      if (target.type === "ball" && balls[target.index]) return target;
-      if (target.type === "paddle" || target.type === "bumper") return target;
-    }
-    this.selectedUpgradeTarget = { type: "ball", index: 0 };
+    if (target && target.type === "ball" && balls[target.index]) return target;
+    const firstBallIndex = balls.findIndex(Boolean);
+    this.selectedUpgradeTarget = { type: "ball", index: firstBallIndex >= 0 ? firstBallIndex : 0 };
     return this.selectedUpgradeTarget;
   },
 
   selectUpgradeTarget(type, index = 0) {
     if (typeof currentState === "undefined" || currentState !== STATE.UPGRADE) return;
+    if (type !== "ball") return;
     if (type === "ball" && !Game.balls[index]) {
       this.handleEmptyBallSlotClick(index);
       return;
     }
-    this.selectedUpgradeTarget = type === "ball" ? { type, index } : { type };
+    this.selectedUpgradeTarget = { type, index };
     this.renderUpgradePanel();
     this.flashUpgradeList("target-switched");
     this.renderSlots(Game.balls, Game.paddle);
   },
 
   showUpgrade(balls, tokens, onPurchase, onComplete) {
+    this.onSkillTargetChanged = null;
     this.upgradeContext = { balls, onPurchase, onComplete };
     if (typeof Game !== "undefined" && Game.updateHud) Game.updateHud();
     this.normalizeUpgradeTarget(balls);
@@ -870,10 +923,10 @@ const UI = {
     if (!list || !this.upgradeContext) return;
     const { balls, onPurchase } = this.upgradeContext;
     const target = this.normalizeUpgradeTarget(balls);
-    list.innerHTML = `
-      ${this.upgradeTargetPanelHtml(target, balls)}
-      ${this.upgradeTargetHtml(target, balls)}
-    `;
+    const ball = balls[target.index] || balls[0];
+    const color = ball ? (ball.skills[0] ? ball.skills[0].color : ball.color) : "#4a9eff";
+    list.style.setProperty("--upgrade-color", color || "#4a9eff");
+    list.innerHTML = this.upgradeBallHtml(ball, target.index || 0);
 
     list.querySelectorAll(".btn-upgrade-buy").forEach((button) => {
       button.addEventListener("click", () => {
@@ -882,36 +935,6 @@ const UI = {
         this.renderUpgradePanel();
         if (bought) this.flashUpgradeList("upgrade-success");
         this.renderSlots(Game.balls, Game.paddle);
-      });
-    });
-    list.querySelectorAll(".btn-carve").forEach((button) => {
-      button.addEventListener("click", () => {
-        const index = Number(button.dataset.ball);
-        if (Game.carveBall(index)) {
-          AudioSystem.playUiSuccess();
-          this.renderUpgradePanel();
-          this.flashUpgradeList("upgrade-success");
-          this.renderSlots(Game.balls, Game.paddle);
-        }
-      });
-    });
-    list.querySelectorAll(".btn-bumper-buy").forEach((button) => {
-      button.addEventListener("click", () => {
-        if (Game.buyBumperLevelWithTokens()) {
-          AudioSystem.playUiSuccess();
-          this.renderUpgradePanel();
-          this.flashUpgradeList("upgrade-success");
-          this.renderSlots(Game.balls, Game.paddle);
-        }
-      });
-    });
-    list.querySelectorAll(".upgrade-target-choice").forEach((button) => {
-      button.addEventListener("click", () => {
-        const type = button.dataset.type;
-        const index = button.dataset.index ? Number(button.dataset.index) : 0;
-        if (button.disabled) return;
-        AudioSystem.playUiOpen();
-        this.selectUpgradeTarget(type, index);
       });
     });
   },
@@ -1034,37 +1057,60 @@ const UI = {
   },
 
   upgradeBallHtml(ball, ballIndex) {
-    const titleStyle = this.ballIconStyle(ball);
-    const rows = Object.keys(UPGRADE_DEFS).map((key) => {
+    if (!ball) return "";
+    const labels = {
+      speed: "SPEED",
+      damage: "DAMAGE",
+      reviveSpeed: "SPAWN",
+      critRate: "CRITICAL"
+    };
+    const rows = ["speed", "damage", "reviveSpeed", "critRate"].map((key) => {
       const definition = UPGRADE_DEFS[key];
-      const level = ball.upgrades[key];
+      const rawLevel = Math.max(0, Math.floor(Number(ball.upgrades[key]) || 0));
+      const level = Math.min(rawLevel, definition.max);
       const cost = getUpgradeCost(level, key);
-      const disabled = Game.tokens < cost || level >= definition.max;
-      const fill = Math.round((level / definition.max) * 100);
+      const disabled = Game.tokens < cost || rawLevel >= definition.max;
+      const isMax = level >= definition.max;
+      const canBuy = !isMax && Game.tokens >= cost;
+      const buttonHint = level >= definition.max
+        ? `${labels[key]} MAX`
+        : `${labels[key]} ${formatNumber(cost)}T`;
+      const priceText = isMax ? "MAX" : `${this.compactUpgradeCost(cost)}T`;
+      const fill = clamp((level / Math.max(1, definition.max)) * 100, 0, 100);
       return `
-        <div class="upgrade-row">
-          <div>
-            <div class="upgrade-name">${definition.label}</div>
-            <div class="upgrade-gauge">LEVEL ${level}/${definition.max}</div>
-            <div class="upgrade-meter" style="--fill:${fill}%"></div>
+        <div class="upgrade-row simple-upgrade-row">
+          <div class="upgrade-main">
+            <div class="upgrade-level-head">
+              <div class="upgrade-name">${labels[key]}</div>
+              <div class="upgrade-gauge">LV ${level}/${definition.max}</div>
+            </div>
+            <div class="upgrade-level-meter" style="--level-fill:${fill}%" aria-label="${labels[key]} LEVEL ${level}/${definition.max}">
+              <span class="upgrade-level-fill"></span>
+            </div>
           </div>
-          <div class="upgrade-actions">
-            <span class="upgrade-cost">${level >= definition.max ? "MAX" : formatNumber(cost)}</span>
-            <button class="btn-buy btn-upgrade-buy" data-ball="${ballIndex}" data-key="${key}" ${disabled ? "disabled" : ""}>BUY</button>
+          <div class="upgrade-actions ${canBuy ? "can-buy" : ""}">
+            <span class="upgrade-price-pill ${isMax ? "maxed" : ""}">
+              <span class="upgrade-price-token"></span>
+              <b>${priceText}</b>
+            </span>
+            <button class="btn-buy btn-upgrade-buy" data-ball="${ballIndex}" data-key="${key}" title="${buttonHint}" aria-label="${buttonHint}" ${disabled ? "disabled" : ""}>BUY</button>
           </div>
         </div>
       `;
     }).join("");
     return `
-      <section class="upgrade-ball">
-        <div class="upgrade-ball-title">
-          <span class="slot-icon" style="${titleStyle}"></span>
-          <span>BALL ${ballIndex + 1}</span>
-        </div>
+      <section class="upgrade-ball simple-upgrade-list">
         ${rows}
-        ${ball.checkCarveCondition() ? `<button class="btn-carve" data-ball="${ballIndex}">CARVE SKILLS +${getTotalStars(ball) * 2} DMG</button>` : ""}
       </section>
     `;
+  },
+
+  compactUpgradeCost(value) {
+    const amount = Math.max(0, Number(value) || 0);
+    if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(amount >= 10_000_000_000 ? 1 : 2).replace(/\.0+$/, "").replace(/(\.\d)0$/, "$1")}B`;
+    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(amount >= 10_000_000 ? 1 : 2).replace(/\.0+$/, "").replace(/(\.\d)0$/, "$1")}M`;
+    if (amount >= 100_000) return `${(amount / 1_000).toFixed(0)}K`;
+    return formatNumber(amount);
   },
 
   upgradePaddleHtml(paddle) {

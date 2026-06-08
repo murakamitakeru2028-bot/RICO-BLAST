@@ -9,6 +9,7 @@ const AudioSystem = {
   lastWallAt: 0,
   hitRun: 0,
   breakIndex: 0,
+  lastComboAccentAt: 0,
 
   ensure() {
     if (this.ctx) return;
@@ -324,6 +325,34 @@ const AudioSystem = {
     this.pluck(1860, 0.032, 0.09, 0.09, pan);
   },
 
+  playComboAccent(combo = 0, paddlelessStreak = 0, root = 720, pan = 0) {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.now();
+    if (this.lastComboAccentAt && t - this.lastComboAccentAt < 0.11) return;
+    this.lastComboAccentAt = t;
+
+    const comboCount = Math.max(0, combo || 0);
+    const tier = this.limit(Math.floor(comboCount / 5), 1, 7);
+    const streak = Math.max(0, paddlelessStreak || 0);
+    const energy = this.limit(0.28 + tier * 0.1 + streak * 0.012, 0.3, 1);
+    const base = Math.min(1280, Math.max(360, root * (0.82 + tier * 0.035)));
+    const top = Math.min(5600, base * (2.35 + energy * 0.75));
+    const isBig = comboCount % 10 === 0;
+
+    this.noise(0.02 + energy * 0.024, 0.04 + energy * 0.012, 6200 + tier * 220, 0, "highpass", 0.55, pan);
+    this.sweep("sine", Math.max(92, base * 0.34), Math.max(48, base * 0.2), 0.024 + energy * 0.022, 0.002, 0.1 + energy * 0.035, 0, pan);
+    this.filteredTone("triangle", base, 0.03 + energy * 0.018, 0.001, 0.1, base * 5.2, 0.006, pan, this.cents(4), "lowpass", 0.7);
+    this.filteredTone("square", this.note(base, 7), 0.018 + energy * 0.014, 0.001, 0.092, base * 4.8, 0.034, pan, this.cents(5), "lowpass", 0.82);
+    this.tone("sine", this.note(base, 12), 0.016 + energy * 0.012, 0.001, 0.12, 0, 0.066, pan);
+    this.sweep("sine", base * 1.25, top, 0.018 + energy * 0.012, 0.003, 0.115, 0.018, pan, this.cents(7));
+
+    if (isBig) {
+      this.noise(0.024 + energy * 0.02, 0.065, 7600, 0.052, "highpass", 0.7, -pan * 0.5);
+      this.sweep("triangle", base * 0.72, this.note(base, 12), 0.036 + energy * 0.02, 0.004, 0.17, 0.05, pan * 0.45);
+      this.tone("sine", this.note(base, 19), 0.014 + energy * 0.01, 0.003, 0.18, 0, 0.12, -pan * 0.35);
+    }
+  },
+
   playBlockHit(combo = 0, paddlelessStreak = 0) {
     this.unlock();
     const t = this.now();
@@ -331,21 +360,30 @@ const AudioSystem = {
     this.hitRun = !this.lastHitAt || t - this.lastHitAt > 0.46 ? 1 : Math.min(32, this.hitRun + 1);
     this.lastHitAt = t;
 
+    const comboCount = Math.max(0, combo || 0);
     const scale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31];
     const streak = Math.max(0, paddlelessStreak || 0);
     const streakLift = Math.max(0, Math.floor((streak - 1) * 1.35));
-    const step = Math.max(0, this.hitRun - 1 + Math.floor((combo || 0) * 0.12) + streakLift);
+    const comboLift = Math.floor(comboCount * 0.22);
+    const step = Math.max(0, this.hitRun - 1 + comboLift + streakLift);
     const semitone = scale[step % scale.length] + Math.floor(step / scale.length) * 12;
-    const pitch = Math.min(2300, this.note(370, semitone));
+    const root = comboCount >= 25 ? 415.3 : 370;
+    const pitch = Math.min(2600, this.note(root, semitone));
     const pan = this.randomPan(0.14);
-    const peak = 0.042 + Math.min(0.033, this.hitRun * 0.0024) + Math.min(0.018, streak * 0.0014);
+    const comboEnergy = this.limit(comboCount / 36, 0, 1);
+    const peak = 0.036 + Math.min(0.03, this.hitRun * 0.002) + Math.min(0.022, comboEnergy * 0.022) + Math.min(0.016, streak * 0.0012);
 
-    this.click(6200, 0.013 + Math.min(0.015, this.hitRun * 0.001), 0, pan);
-    this.filteredTone("square", pitch, peak, 0.001, 0.045, pitch * 4.2, 0, pan, this.cents(5), "lowpass", 0.9);
-    this.tone("sine", pitch * 2.01, 0.017 + Math.min(0.012, streak * 0.0009), 0.001, 0.04, 0, 0.006, pan);
-    if (this.hitRun >= 5 || streak >= 4) this.tone("triangle", Math.min(3600, pitch * 2.8), 0.013 + Math.min(0.01, streak * 0.0007), 0.001, 0.036, 0, 0.014, pan);
-    if (this.hitRun % 8 === 0 || streak >= 8 && streak % 4 === 0) {
-      this.sweep("sine", pitch * 1.35, Math.min(4200, pitch * 2.35), 0.028, 0.002, 0.07, 0.01, pan);
+    this.click(7000 + comboEnergy * 900, 0.012 + Math.min(0.014, this.hitRun * 0.0009), 0, pan);
+    this.filteredTone("triangle", pitch, peak, 0.001, 0.05, pitch * 5.6, 0, pan, this.cents(5), "lowpass", 0.72);
+    this.filteredTone("square", pitch * 0.5, 0.012 + comboEnergy * 0.008, 0.001, 0.04, pitch * 2.2, 0.004, pan, this.cents(4), "lowpass", 0.75);
+    this.tone("sine", pitch * 2.01, 0.014 + Math.min(0.014, comboEnergy * 0.012 + streak * 0.0008), 0.001, 0.045, 0, 0.008, pan);
+    if (comboCount >= 3 || this.hitRun >= 5 || streak >= 4) {
+      this.tone("triangle", Math.min(3900, pitch * 2.72), 0.01 + Math.min(0.012, comboEnergy * 0.009 + streak * 0.0006), 0.001, 0.038, 0, 0.016, pan);
+    }
+    if ((comboCount >= 5 && comboCount % 5 === 0) || (streak >= 8 && streak % 4 === 0)) {
+      this.playComboAccent(comboCount, streak, pitch, pan);
+    } else if (this.hitRun % 8 === 0) {
+      this.sweep("sine", pitch * 1.35, Math.min(4400, pitch * 2.45), 0.022 + comboEnergy * 0.01, 0.002, 0.07, 0.01, pan);
     }
   },
 

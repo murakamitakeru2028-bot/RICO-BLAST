@@ -267,20 +267,11 @@ class Block {
 
     if (this.isSpecial) this.drawEffectMark(ctx, x, y, w, h);
 
-    const borderColor = this.effect === "dive" && this.diveRemaining > 0
-      ? "rgba(255,255,255,0.48)"
-      : (this.definition.borderColor ||
-        Block.mixColor(colors.accent || colors.body, "#ffffff", this.type === "stone" ? 0.46 : 0.34));
-    const borderWidth = this.definition.borderWidth || 2;
-
-    ctx.globalAlpha = 0.42;
-    ctx.strokeStyle = "rgba(0,0,0,0.72)";
-    ctx.lineWidth = borderWidth + 0.8;
-    roundedRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, r);
-    ctx.stroke();
+    const borderColor = colors.body;
+    const borderWidth = 2;
 
     ctx.strokeStyle = borderColor;
-    ctx.globalAlpha = 0.92;
+    ctx.globalAlpha = 0.96;
     ctx.lineWidth = borderWidth;
     roundedRect(ctx, x + 0.6, y + 0.6, w - 1.2, h - 1.2, r);
     ctx.stroke();
@@ -493,8 +484,6 @@ Block.types = {
     gridSpanCols: 1,
     borderWidth: 4,
     borderColor: "rgba(255,255,255,0.4)",
-    hpBarHeight: 3,
-    hpBarColor: "rgba(255,255,255,0.55)",
     colors: {
       body: "#2a2a3e",
       empty: "#151523",
@@ -509,8 +498,6 @@ Block.types = {
     gridSpanCols: 1,
     borderWidth: 4,
     borderColor: "rgba(255,255,255,0.4)",
-    hpBarHeight: 3,
-    hpBarColor: "rgba(255,255,255,0.55)",
     colors: {
       body: "#2a2a3e",
       empty: "#151523",
@@ -525,8 +512,6 @@ Block.types = {
     gridSpanCols: 2,
     borderWidth: 4,
     borderColor: "rgba(255,255,255,0.4)",
-    hpBarHeight: 3,
-    hpBarColor: "rgba(255,255,255,0.55)",
     colors: {
       body: "#2a2a3e",
       empty: "#151523",

@@ -158,9 +158,37 @@ button {
   line-height: 1;
 }
 
+#hud-skill-progress {
+  position: relative;
+  width: min(122px, 34vw);
+  height: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(103,216,255,0.18);
+  border-radius: 999px;
+  background: rgba(246,251,255,0.055);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.14) inset;
+}
+
+#hud-skill-progress-fill {
+  display: block;
+  width: var(--skill-progress-fill, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #44ddcc, #7cf5b2);
+  box-shadow: 0 0 9px rgba(124,245,178,0.28);
+  transition: width 0.18s ease;
+}
+
+#hud-skill-progress.ready {
+  border-color: rgba(124,245,178,0.42);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.14) inset,
+    0 0 12px rgba(124,245,178,0.26);
+}
+
 #score-gain-text {
   position: absolute;
-  top: calc(100% - 2px);
+  top: calc(100% + 1px);
   left: 50%;
   translate: -50% 0;
   z-index: 6;
@@ -532,14 +560,16 @@ button {
   display: flex;
 }
 
-#screen-skill.game-panel.active {
-  align-items: center;
-  justify-content: center;
-}
-
+#screen-skill.game-panel.active,
 #screen-upgrade.game-panel.active {
   align-items: flex-end;
   justify-content: center;
+  padding-bottom: 4px;
+}
+
+#screen-skill.game-panel.active,
+#screen-upgrade.game-panel.active {
+  padding-inline: 2px;
 }
 
 #screen-gameover.game-panel {
@@ -629,6 +659,100 @@ button {
     0 0 14px rgba(255,230,107,0.1);
 }
 
+#slot-bar .slot.store-empty {
+  opacity: 0.92;
+  border-style: solid;
+  border-color: rgba(255,230,107,0.2);
+  background:
+    linear-gradient(180deg, rgba(255,230,107,0.06), rgba(255,255,255,0.012)),
+    #10131f;
+}
+
+#slot-bar .slot.store-empty.buyable {
+  opacity: 1;
+  border-color: rgba(255,230,107,0.52);
+  background:
+    linear-gradient(180deg, rgba(255,230,107,0.12), rgba(255,255,255,0.018)),
+    #151423;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 0 18px rgba(255,230,107,0.16);
+}
+
+#slot-bar .slot.store-empty.locked {
+  opacity: 0.48;
+}
+
+.slot-buy-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.slot-buy-icon {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,230,107,0.42);
+  border-radius: 50%;
+  background: rgba(255,230,107,0.12);
+  color: var(--token-color);
+  font-family: "Space Mono", monospace;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 10px rgba(255,230,107,0.14);
+}
+
+.slot-buy-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.slot-buy-price {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--token-color);
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.slot-buy-state,
+.slot-buy-note {
+  min-width: 0;
+  overflow: hidden;
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.slot-buy-state {
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 6px;
+  border: 1px solid rgba(255,230,107,0.24);
+  border-radius: 5px;
+  background: rgba(255,230,107,0.08);
+  color: var(--token-color);
+  font-size: 9px;
+}
+
+.slot-buy-note {
+  color: rgba(246,251,255,0.46);
+  font-size: 7.5px;
+}
+
 #slot-bar .slot.fallen {
   border-color: rgba(255,95,136,0.58);
   background:
@@ -671,6 +795,31 @@ button {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--selected-color, var(--primary-skill-color, #67d8ff)) 15%, transparent), rgba(255,255,255,0.028)),
     #111524;
+}
+
+#slot-bar .slot.selected-skill {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--primary-skill-color, #ffe66b) 88%, rgba(255,255,255,0.18)) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.12) inset,
+    0 0 0 1px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 48%, transparent) inset,
+    0 0 28px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 34%, transparent);
+}
+
+#slot-bar .slot.selected-skill .slot-tag {
+  color: color-mix(in srgb, var(--primary-skill-color, #ffe66b) 80%, #ffffff);
+}
+
+#slot-bar .slot.selected-upgrade {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.12) inset,
+    0 0 0 1px color-mix(in srgb, var(--selected-color, #4a9eff) 48%, transparent) inset,
+    0 0 26px color-mix(in srgb, var(--selected-color, #4a9eff) 34%, transparent);
+}
+
+#slot-bar .slot.selected-upgrade .slot-tag {
+  color: color-mix(in srgb, var(--selected-color, #4a9eff) 78%, #ffffff);
 }
 
 #slot-bar .slot.launch-ready {
@@ -1061,17 +1210,23 @@ button {
 }
 
 .slot.selected-upgrade::after {
-  content: "ACTIVE";
+  content: "UPGRADE";
   border: 1px solid color-mix(in srgb, var(--selected-color, #4a9eff) 42%, rgba(255,255,255,0.12));
   background: color-mix(in srgb, var(--selected-color, #4a9eff) 15%, transparent);
   color: color-mix(in srgb, var(--selected-color, #4a9eff) 82%, #ffffff);
 }
 
 .slot.selected-skill::after {
-  content: "TARGET";
-  border: 1px solid color-mix(in srgb, var(--primary-skill-color, #ffe66b) 46%, rgba(255,255,255,0.12));
-  background: color-mix(in srgb, var(--primary-skill-color, #ffe66b) 18%, transparent);
-  color: color-mix(in srgb, var(--primary-skill-color, #ffe66b) 86%, #ffffff);
+  content: "";
+  inset: 3px;
+  padding: 0;
+  border: 1.5px solid color-mix(in srgb, var(--primary-skill-color, #ffe66b) 72%, rgba(255,255,255,0.24));
+  border-radius: 6px;
+  background: transparent;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 28%, transparent) inset,
+    0 0 16px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 28%, transparent);
+  pointer-events: none;
 }
 
 .slot.launch-ready::after {
@@ -1079,6 +1234,19 @@ button {
   border: 1px solid rgba(74,255,136,0.34);
   background: rgba(74,255,136,0.13);
   color: var(--accent-green);
+}
+
+.slot.selected-skill.launch-ready::after {
+  content: "";
+  inset: 3px;
+  padding: 0;
+  border: 1.5px solid color-mix(in srgb, var(--primary-skill-color, #ffe66b) 72%, rgba(255,255,255,0.24));
+  border-radius: 6px;
+  background: transparent;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 28%, transparent) inset,
+    0 0 16px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 28%, transparent);
+  pointer-events: none;
 }
 
 .slot.disabled-target {
@@ -1527,11 +1695,11 @@ button {
 }
 
 #game-stage .skill-panel {
-  width: min(100%, 386px);
-  max-height: 76%;
+  width: min(100%, 520px);
+  max-height: 90%;
   height: auto;
-  gap: 8px;
-  padding: 12px;
+  gap: 11px;
+  padding: 15px 8px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 8px;
@@ -1547,12 +1715,12 @@ button {
 #game-stage .skill-panel .overlay-kicker {
   margin-bottom: 0;
   color: color-mix(in srgb, var(--accent-green) 42%, var(--text-muted));
-  font-size: 9px;
+  font-size: 10px;
 }
 
 #game-stage .skill-panel .overlay-title {
   margin-bottom: 0;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 #skill-reroll-row {
@@ -1655,7 +1823,7 @@ button {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
   min-height: 0;
   flex: 0 1 auto;
   align-items: stretch;
@@ -1671,35 +1839,34 @@ button {
 }
 
 .skill-panel:has(#ball-picker:not(:empty)) .skill-card {
-  min-height: 116px;
-  gap: 4px;
-  padding: 6px 5px;
+  height: 140px;
+  min-height: 140px;
+  gap: 5px;
+  padding: 8px 6px;
 }
 
 .skill-panel:has(#ball-picker:not(:empty)) .skill-icon {
-  width: 18px;
-  height: 18px;
-  flex-basis: 18px;
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
 }
 
 .skill-panel:has(#ball-picker:not(:empty)) .skill-description {
-  -webkit-line-clamp: 2;
-}
-
-.skill-panel:has(#ball-picker:not(:empty)) .skill-effect-lines {
-  display: none;
+  -webkit-line-clamp: 3;
 }
 
 .skill-card {
+  height: 184px;
   min-height: 184px;
   width: 100%;
+  overflow: hidden;
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: auto minmax(0, 1fr);
   align-items: start;
   justify-items: stretch;
-  gap: 7px;
-  padding: 9px 7px;
+  gap: 8px;
+  padding: 10px 8px;
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 8px;
   background:
@@ -1745,9 +1912,9 @@ button {
 }
 
 .skill-icon {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
   border: 1px solid rgba(232, 248, 255, 0.56);
   border-radius: 50%;
   box-shadow: none;
@@ -1755,11 +1922,13 @@ button {
 
 .skill-copy {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   align-items: stretch;
   width: 100%;
+  height: 100%;
 }
 
 .skill-name-row {
@@ -1767,7 +1936,7 @@ button {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 5px;
   width: 100%;
 }
 
@@ -1776,7 +1945,7 @@ button {
   overflow: hidden;
   color: var(--text-primary);
   max-width: 100%;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1.15;
   white-space: normal;
@@ -1788,20 +1957,42 @@ button {
 
 .skill-stars {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
   font-family: "Space Mono", monospace;
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1;
   letter-spacing: 0;
 }
 
+.skill-star {
+  color: rgba(246,251,255,0.28);
+}
+
+.skill-star.filled {
+  color: color-mix(in srgb, var(--skill-color, #ffffff) 78%, #ffffff);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--skill-color, #ffffff) 42%, transparent);
+}
+
+.skill-stars-empty {
+  padding: 4px 6px;
+  border: 1px solid rgba(255,255,255,0.11);
+  border-radius: 5px;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.035);
+  font-size: 9px;
+  font-weight: 700;
+}
+
 .skill-description {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1.32;
+  line-height: 1.34;
   text-align: left;
   display: -webkit-box;
-  -webkit-line-clamp: 5;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1816,14 +2007,14 @@ button {
   color: color-mix(in srgb, var(--skill-color, #ffffff) 72%, var(--text-secondary));
   background: color-mix(in srgb, var(--skill-color, #ffffff) 10%, transparent);
   font-family: "Space Mono", monospace;
-  font-size: 7.5px;
+  font-size: 8.5px;
   font-weight: 700;
   line-height: 1;
 }
 
 .skill-effect-lines {
+  display: none;
   min-width: 0;
-  display: flex;
   flex-direction: column;
   gap: 4px;
   margin-top: auto;
@@ -1853,12 +2044,12 @@ button {
 
 .skill-effect-lines b {
   color: color-mix(in srgb, var(--skill-color, #ffffff) 72%, var(--text-muted));
-  font-size: 7.5px;
+  font-size: 8.5px;
 }
 
 .skill-effect-lines em {
   color: var(--text-primary);
-  font-size: 8.2px;
+  font-size: 9px;
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -1990,9 +2181,23 @@ button {
 }
 
 .skill-target-panel {
-  padding: 8px;
-  max-height: 154px;
+  padding: 9px;
+  max-height: 186px;
   overflow: hidden;
+}
+
+.skill-target-panel.idle-target {
+  border-color: color-mix(in srgb, var(--target-color, #67d8ff) 46%, rgba(255,255,255,0.12));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--target-color, #67d8ff) 13%, transparent), rgba(255,255,255,0.018)),
+    #14142a;
+}
+
+.skill-target-panel.choosing-skill {
+  border-color: color-mix(in srgb, var(--target-color, #ffe66b) 58%, rgba(255,255,255,0.12));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--target-color, #ffe66b) 16%, transparent) inset,
+    0 0 20px color-mix(in srgb, var(--target-color, #ffe66b) 16%, transparent);
 }
 
 .skill-target-grid {
@@ -2004,7 +2209,7 @@ button {
 
 .ball-target {
   min-width: 0;
-  min-height: 78px;
+  min-height: 82px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -2020,6 +2225,16 @@ button {
   box-shadow:
     0 0 0 1px rgba(0,0,0,0.16) inset,
     0 8px 14px rgba(0,0,0,0.13);
+}
+
+.ball-target.selected {
+  border-color: color-mix(in srgb, var(--target-color, #ffe66b) 82%, rgba(255,255,255,0.18));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--target-color, #ffe66b) 16%, transparent), rgba(255,255,255,0.026)),
+    #1b1b34;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--target-color, #ffe66b) 30%, transparent) inset,
+    0 0 16px color-mix(in srgb, var(--target-color, #ffe66b) 20%, transparent);
 }
 
 .ball-target:active {
@@ -2095,6 +2310,30 @@ button {
   font-weight: 700;
   line-height: 1;
   text-align: center;
+}
+
+.ball-target.selected .ball-target-state {
+  border-color: color-mix(in srgb, var(--target-color, #ffe66b) 44%, rgba(255,255,255,0.12));
+  background: color-mix(in srgb, var(--target-color, #ffe66b) 18%, transparent);
+  color: color-mix(in srgb, var(--target-color, #ffe66b) 90%, #ffffff);
+}
+
+.target-selected-skills {
+  min-width: 0;
+  max-height: 36px;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.target-selected-skills .target-skill-chip {
+  width: min(100%, 92px);
+}
+
+.target-selected-skills .target-skill-empty {
+  width: 84px;
+  height: 18px;
 }
 
 .target-skill-chip {
@@ -2182,17 +2421,18 @@ button {
 }
 
 .upgrade-panel {
-  width: min(100%, 390px);
+  width: min(100%, 520px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 #game-stage .upgrade-panel {
-  width: min(100%, 390px);
+  width: min(100%, 520px);
   height: auto;
-  max-height: 76%;
+  max-height: 84%;
   flex: 0 1 auto;
+  padding: 12px 8px 10px;
 }
 
 #upgrade-list {
@@ -2215,12 +2455,12 @@ button {
 }
 
 .upgrade-simple-header {
-  min-height: 34px;
+  min-height: 42px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  padding: 5px 7px;
+  gap: 9px;
+  padding: 7px 9px;
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 7px;
   background: rgba(21,21,41,0.78);
@@ -2231,12 +2471,12 @@ button {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: 9px;
 }
 
 .upgrade-simple-title .target-avatar {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 .upgrade-simple-title span {
@@ -2260,29 +2500,29 @@ button {
 
 .upgrade-simple-title b {
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .upgrade-simple-title em {
   color: color-mix(in srgb, var(--target-color, #ffffff) 68%, var(--text-muted));
-  font-size: 7px;
+  font-size: 8.5px;
 }
 
 .upgrade-simple-token {
-  min-width: 68px;
+  min-width: 76px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 6px;
-  padding: 4px 6px;
+  padding: 6px 8px;
   border: 1px solid rgba(255,230,107,0.2);
   border-radius: 6px;
   background: rgba(255,230,107,0.05);
 }
 
 .upgrade-simple-token span {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
   transform: rotate(45deg);
   border: 1px solid rgba(255,255,255,0.36);
   border-radius: 2px;
@@ -2294,7 +2534,7 @@ button {
   overflow: hidden;
   color: var(--token-color);
   font-family: "Space Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
   line-height: 1;
   text-align: right;
@@ -2396,17 +2636,17 @@ button {
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.15fr) minmax(0, 1.15fr);
-  gap: 4px;
+  gap: 5px;
 }
 
 .upgrade-target-choice {
   min-width: 0;
-  min-height: 34px;
+  min-height: 42px;
   display: grid;
-  grid-template-rows: 14px auto;
+  grid-template-rows: 17px auto;
   place-items: center;
-  gap: 2px;
-  padding: 4px 3px;
+  gap: 3px;
+  padding: 5px 4px;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 6px;
   background: rgba(21,21,41,0.68);
@@ -2431,22 +2671,22 @@ button {
 }
 
 .upgrade-target-choice-icon {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   border: 1px solid rgba(255,255,255,0.24);
   border-radius: 50%;
 }
 
 .upgrade-target-choice-paddle {
-  width: 30px;
-  height: 7px;
+  width: 34px;
+  height: 8px;
   border-radius: 999px;
   background: linear-gradient(180deg, #ffffff, #dbe7f0);
 }
 
 .upgrade-target-choice-bumper {
-  width: 32px;
-  height: 7px;
+  width: 36px;
+  height: 8px;
   position: relative;
   overflow: hidden;
   border-radius: 4px;
@@ -2481,7 +2721,7 @@ button {
 
 .upgrade-target-choice-label {
   color: var(--text-primary);
-  font-size: 8px;
+  font-size: 9.5px;
 }
 
 .upgrade-target-choice-state {
@@ -2492,7 +2732,7 @@ button {
 
 #game-stage #upgrade-list {
   flex: 0 1 auto;
-  margin-top: 3px;
+  margin-top: 0;
   overflow: hidden;
   padding-right: 0;
 }
@@ -2523,7 +2763,7 @@ button {
   min-height: 0;
   overflow: hidden;
   margin-bottom: 0;
-  padding: 8px;
+  padding: 10px;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 7px;
   background: rgba(13,13,26,0.48);
@@ -2532,7 +2772,17 @@ button {
 #game-stage .upgrade-ball {
   flex: 0 1 auto;
   margin-bottom: 0;
-  padding: 7px;
+  padding: 9px;
+}
+
+.upgrade-ball.simple-upgrade-list {
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .upgrade-ball-title {
@@ -2552,34 +2802,66 @@ button {
 }
 
 .upgrade-row {
-  min-height: 42px;
+  min-height: 50px;
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 8px;
-  padding: 7px;
-  margin-top: 5px;
+  gap: 10px;
+  padding: 8px;
+  margin-top: 7px;
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 6px;
   background: rgba(255,255,255,0.026);
 }
 
 #game-stage .upgrade-row {
-  min-height: 38px;
+  min-height: 48px;
+  gap: 9px;
+  padding: 8px;
+}
+
+.simple-upgrade-row {
+  min-height: 62px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  margin-top: 0;
+  padding: 10px 11px;
+  border-color: rgba(255,255,255,0.085);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--upgrade-color, #4a9eff) 7%, transparent), rgba(255,255,255,0.018)),
+    rgba(13,13,26,0.54);
+}
+
+#game-stage .simple-upgrade-row {
+  min-height: 62px;
+  padding: 10px 11px;
+}
+
+.upgrade-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   gap: 7px;
-  padding: 6px;
+}
+
+.upgrade-level-head {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .upgrade-name {
-  margin-bottom: 3px;
+  margin-bottom: 0;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
 }
 
 #game-stage .upgrade-name {
-  margin-bottom: 3px;
-  font-size: 11px;
+  margin-bottom: 0;
+  font-size: 13px;
 }
 
 .upgrade-gauge {
@@ -2591,8 +2873,47 @@ button {
   letter-spacing: 0;
 }
 
+.upgrade-level-meter {
+  position: relative;
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.12), rgba(255,255,255,0.04)),
+    rgba(5,8,15,0.44);
+}
+
+.upgrade-level-meter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent calc(10% - 1px),
+    rgba(255,255,255,0.07) calc(10% - 1px),
+    rgba(255,255,255,0.07) 10%
+  );
+  pointer-events: none;
+}
+
+.upgrade-level-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--level-fill, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--upgrade-color, #4a9eff) 78%, #ffffff), var(--upgrade-color, #4a9eff));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--upgrade-color, #4a9eff) 22%, transparent);
+  transition: width 0.18s ease;
+}
+
 #game-stage .upgrade-gauge {
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .upgrade-meter {
@@ -2607,8 +2928,8 @@ button {
 
 #game-stage .upgrade-meter {
   width: 100%;
-  height: 5px;
-  margin-top: 4px;
+  height: 6px;
+  margin-top: 5px;
 }
 
 .upgrade-meter::before {
@@ -2623,6 +2944,62 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.simple-upgrade-row .upgrade-actions {
+  min-width: 152px;
+  display: grid;
+  grid-template-columns: minmax(84px, 1fr) auto;
+  align-items: center;
+  justify-content: end;
+  gap: 8px;
+}
+
+.upgrade-price-pill {
+  min-width: 84px;
+  height: 28px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  border: 1px solid rgba(255,230,107,0.22);
+  border-radius: 7px;
+  background: rgba(255,230,107,0.07);
+  color: var(--token-color);
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.upgrade-price-pill b {
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.upgrade-price-pill.maxed {
+  border-color: rgba(246,251,255,0.12);
+  background: rgba(246,251,255,0.045);
+  color: var(--text-muted);
+}
+
+.upgrade-price-token {
+  width: 9px;
+  height: 9px;
+  transform: rotate(45deg);
+  border: 1px solid rgba(255,255,255,0.34);
+  border-radius: 2px;
+  background: var(--token-color);
+  box-shadow: 0 0 7px rgba(255,230,107,0.22);
+}
+
+.upgrade-price-pill.maxed .upgrade-price-token {
+  background: rgba(246,251,255,0.24);
+  box-shadow: none;
 }
 
 .upgrade-value {
@@ -2645,32 +3022,64 @@ button {
 }
 
 #game-stage .upgrade-cost {
-  min-width: 26px;
-  font-size: 11px;
+  min-width: 32px;
+  font-size: 13px;
+}
+
+.simple-upgrade-row .upgrade-cost {
+  min-width: 56px;
+  color: color-mix(in srgb, var(--token-color) 82%, #ffffff);
+  font-size: 12px;
 }
 
 .btn-buy {
-  min-width: 48px;
-  height: 30px;
-  border: 1px solid var(--line-strong);
+  min-width: 54px;
+  height: 32px;
+  border: 1px solid rgba(124,245,178,0.42);
   border-radius: 8px;
-  background: var(--bg-panel-strong);
-  color: var(--text-primary);
-  font-family: "Space Mono", monospace;
-  font-size: 12px;
-  font-weight: 700;
+  background:
+    linear-gradient(180deg, rgba(124,245,178,0.22), rgba(58,210,165,0.1)),
+    #17241f;
+  color: color-mix(in srgb, var(--accent-green) 72%, #ffffff);
+  font-family: "Nunito", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
   cursor: pointer;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.1) inset,
+    0 0 12px rgba(124,245,178,0.1);
 }
 
 #game-stage .btn-buy {
-  min-width: 42px;
-  height: 26px;
-  font-size: 10px;
+  min-width: 56px;
+  height: 34px;
+  font-size: 13px;
+}
+
+.simple-upgrade-row .btn-buy,
+#game-stage .simple-upgrade-row .btn-buy {
+  min-width: 58px;
+  height: 34px;
+  font-size: 13px;
 }
 
 .btn-buy:disabled {
   opacity: 0.38;
   cursor: not-allowed;
+  border-color: rgba(246,251,255,0.12);
+  background: rgba(246,251,255,0.045);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.upgrade-actions.can-buy .btn-buy {
+  border-color: rgba(124,245,178,0.7);
+  background:
+    linear-gradient(180deg, #9effd0 0%, #4ee6b4 100%);
+  color: #062319;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.34) inset,
+    0 0 14px rgba(124,245,178,0.22);
 }
 
 .btn-carve {
@@ -2688,9 +3097,9 @@ button {
 }
 
 #game-stage .btn-carve {
-  min-height: 32px;
-  margin-top: 8px;
-  font-size: 10px;
+  min-height: 38px;
+  margin-top: 9px;
+  font-size: 12px;
 }
 
 .upgrade-skill-box {
@@ -2727,10 +3136,10 @@ button {
 }
 
 #game-stage #btn-continue {
-  flex: 0 0 40px;
-  height: 40px;
-  margin-top: 6px;
-  font-size: 12px;
+  flex: 0 0 46px;
+  height: 46px;
+  margin-top: 8px;
+  font-size: 14px;
 }
 
 #btn-continue:active {
@@ -3570,7 +3979,7 @@ button {
 }
 
 #game-stage .skill-panel .overlay-title {
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .skill-reroll-status {
@@ -3586,16 +3995,16 @@ button {
 }
 
 .skill-name {
-  font-size: 12.5px;
+  font-size: 14px;
 }
 
 .skill-stars {
-  font-size: 10.5px;
+  font-size: 13px;
 }
 
 .skill-description {
-  font-size: 10px;
-  line-height: 1.28;
+  font-size: 11px;
+  line-height: 1.34;
   -webkit-line-clamp: 4;
 }
 
@@ -3628,24 +4037,35 @@ button {
 
 .upgrade-simple-title b,
 .upgrade-name {
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .upgrade-simple-title em,
 .upgrade-gauge,
-.upgrade-cost,
 .upgrade-value {
   font-size: 10px;
+}
+
+.upgrade-cost {
+  font-size: 13px;
 }
 
 .upgrade-target-choice-label,
 .upgrade-target-choice-state,
 .btn-buy,
+.btn-carve {
+  font-size: 12px;
+}
+
 #game-stage .btn-buy,
-.btn-carve,
 #game-stage .btn-carve,
 #btn-continue,
 #game-stage #btn-continue {
+  font-size: 14px;
+}
+
+.upgrade-target-choice-label,
+.upgrade-target-choice-state {
   font-size: 11px;
 }
 
@@ -3833,6 +4253,77 @@ button {
 
 .slot-bumper-icon {
   height: 11px;
+}
+
+#slot-bar.skill-select-mode {
+  gap: 5px;
+  padding-block: 6px 8px;
+}
+
+#slot-bar.skill-select-mode .slot {
+  transform-origin: center;
+  transition:
+    opacity 0.16s ease,
+    filter 0.16s ease,
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+}
+
+#slot-bar.skill-select-mode .slot:not(.selected-skill) {
+  opacity: 0.38;
+  filter: saturate(0.55) brightness(0.68);
+  transform: translateY(1px) scale(0.94);
+}
+
+#slot-bar.skill-select-mode .slot:not(.selected-skill) .slot-top,
+#slot-bar.skill-select-mode .slot:not(.selected-skill) .slot-skills-stack,
+#slot-bar.skill-select-mode .slot:not(.selected-skill) .slot-buy-card,
+#slot-bar.skill-select-mode .slot:not(.selected-skill) .slot-buy-state,
+#slot-bar.skill-select-mode .slot:not(.selected-skill) .slot-buy-note {
+  opacity: 0.72;
+}
+
+#slot-bar.skill-select-mode .slot.selected-skill {
+  z-index: 4;
+  opacity: 1;
+  filter: none;
+  transform: translateY(-5px) scale(1.055);
+  border-color: color-mix(in srgb, var(--primary-skill-color, #ffe66b) 92%, rgba(255,255,255,0.24)) !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary-skill-color, #ffe66b) 24%, transparent), rgba(255,255,255,0.04)),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary-skill-color, #ffe66b) 24%, transparent), transparent 58%),
+    #16182c;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.16) inset,
+    0 0 0 1px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 56%, transparent) inset,
+    0 10px 26px rgba(0,0,0,0.24),
+    0 0 34px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 42%, transparent);
+}
+
+#slot-bar.skill-select-mode .slot.selected-skill::after,
+#slot-bar.skill-select-mode .slot.selected-skill.launch-ready::after {
+  inset: -2px;
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--primary-skill-color, #ffe66b) 78%, rgba(246,251,255,0.32));
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 38%, transparent) inset,
+    0 0 18px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 34%, transparent),
+    0 0 34px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 18%, transparent);
+}
+
+#slot-bar.skill-select-mode .slot.selected-skill .slot-icon {
+  transform: scale(1.18);
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--primary-skill-color, #67d8ff) 54%, transparent),
+    0 1px 0 rgba(255,255,255,0.32) inset;
+}
+
+#slot-bar.skill-select-mode .slot.selected-skill .slot-tag {
+  color: #f6fbff;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--primary-skill-color, #ffe66b) 42%, transparent);
 }
 
 .slot-bumper-icon::before {

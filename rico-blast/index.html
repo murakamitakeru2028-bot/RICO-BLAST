@@ -27,6 +27,9 @@
       <div id="hud-score-block">
         <span class="hud-label">SCORE</span>
         <b id="hud-score">0</b>
+        <div id="hud-skill-progress" aria-label="SKILL 0 / 30">
+          <span id="hud-skill-progress-fill"></span>
+        </div>
       </div>
       <span id="hud-timer">0:00</span>
       <button id="btn-pause" class="hud-button" type="button">STOP</button>
@@ -50,7 +53,6 @@
 
       <div id="screen-upgrade" class="game-panel">
         <div class="overlay-panel upgrade-panel">
-          <p class="overlay-kicker">UPGRADE</p>
           <div id="upgrade-list"></div>
           <button id="btn-continue">CONTINUE</button>
         </div>

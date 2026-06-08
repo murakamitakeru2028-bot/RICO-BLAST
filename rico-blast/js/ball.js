@@ -165,16 +165,30 @@ class Ball {
     if (aura > 0) {
       this.auraTimer -= dt;
       if (this.auraTimer <= 0) {
+        const auraRadius = skillParam("aura", aura, "radius", 50);
         this.auraTimer = skillParam("aura", aura, "interval", 0.1);
-        game.applyAreaDamage(
+        const hitCount = game.applyAreaDamage(
           this.x,
           this.y,
-          skillParam("aura", aura, "radius", 50),
-          (block) => skillDamageByMaxHp(block, "aura", aura),
+          auraRadius,
+          () => Math.max(1, Math.round(this.getBaseDamage(game) * skillParam("aura", aura, "damage", 0))),
           this,
           null,
           "aura"
         );
+        if (hitCount > 0) {
+          game.addZone({
+            kind: "auraPulse",
+            x: this.x,
+            y: this.y,
+            radius: auraRadius,
+            life: 0.18,
+            maxLife: 0.18,
+            hitCount,
+            color: SKILLS.aura.color,
+            sourceBall: this
+          });
+        }
       }
     }
 
@@ -194,17 +208,10 @@ class Ball {
           tick: 0.2,
           tickTimer: 0,
           color: SKILLS.echo.color,
+          vx: this.vx,
+          vy: this.vy,
           sourceBall: this
         });
-      }
-    }
-
-    const mirror = getSkillLevel(this, "mirror");
-    if (mirror > 0) {
-      this.mirrorTimer -= dt;
-      if (this.mirrorTimer <= 0) {
-        this.mirrorTimer = skillParam("mirror", mirror, "interval", 1.5);
-        game.spawnProjectile(this.x, this.y, -this.vx, this.vy, 4.2, (block) => skillDamageByMaxHp(block, "mirror", mirror), this, SKILLS.mirror.color, 0, true);
       }
     }
 
@@ -293,12 +300,16 @@ class Ball {
       Effects.showPopup("SUPER", this.x, this.y - 18, SKILLS.superBounce.color);
     }
 
+    this.normalizeSpeed(this.getTargetSpeed());
+    this.spawnMirrorPaddleClone(game, center, width);
+
     const teleporter = getSkillLevel(this, "teleporter");
     if (teleporter > 0 && Math.random() < skillParam("teleporter", teleporter, "chance", 0)) {
-      const anchor = game.findDenseBlockAnchor();
+      const maxTeleportY = game.getTeleporterMaxY ? game.getTeleporterMaxY() : game.height * 0.58;
+      const anchor = game.findDenseBlockAnchor(maxTeleportY - 36);
       if (anchor) {
         this.x = clamp(anchor.x, this.radius, game.width - this.radius);
-        this.y = clamp(anchor.y + 36, this.radius, game.height - 90);
+        this.y = clamp(anchor.y + 36, this.radius, maxTeleportY);
         this.vy = -Math.abs(this.vy);
         Effects.showPopup("WARP", this.x, this.y - 18, SKILLS.teleporter.color);
       }
@@ -308,6 +319,41 @@ class Ball {
     AudioSystem.playPaddle();
     Effects.shakeScreen(1.5, 0.08);
     this.normalizeSpeed(this.getTargetSpeed());
+  }
+
+  spawnMirrorPaddleClone(game, paddleCenter, paddleWidth) {
+    const mirror = getSkillLevel(this, "mirror");
+    if (mirror <= 0 || !game || !game.paddle) return;
+    const mirroredOffset = -(this.x - paddleCenter);
+    const mirrorX = clamp(paddleCenter + mirroredOffset, game.paddle.x + this.radius, game.paddle.x + paddleWidth - this.radius);
+    const mirrorY = game.paddle.y - this.radius - 0.5;
+    const speed = Math.max(4.2, this.getCurrentSpeed());
+    const duration = skillParam("mirror", mirror, "duration", 0.9);
+    const maxHits = skillParam("mirror", mirror, "hits", 3);
+    game.spawnProjectile(
+      mirrorX,
+      mirrorY,
+      -this.vx,
+      this.vy,
+      speed,
+      (block) => skillDamageByMaxHp(block, "mirror", mirror),
+      this,
+      SKILLS.mirror.color,
+      0,
+      true,
+      {
+        kind: "mirror",
+        radius: this.radius,
+        alpha: 0.38,
+        coreColor: this.getPrimaryColor(),
+        life: duration,
+        maxHits,
+        bounceWalls: true,
+        bounceBlocks: true,
+        hitSource: "ball"
+      }
+    );
+    Effects.spawnImpactSpark(mirrorX, mirrorY, SKILLS.mirror.color);
   }
 
   checkBumper(game, prevX = this.x, prevY = this.y) {
@@ -422,7 +468,7 @@ class Ball {
 
     if (this.cycleEffect === "damage") damage *= skillParam("cycle", getSkillLevel(this, "cycle"), "damageMultiplier", 1.5);
 
-    const critChance = this.upgrades.critRate * 0.05;
+    const critChance = Math.min(0.85, this.getUpgradeCurve(this.upgrades.critRate, 0.05, 0.006));
     if (Math.random() < critChance) {
       damage *= 2;
       Effects.showPopup("CRITICAL!", block.cx, block.cy - 14, "#ffffff");
@@ -557,15 +603,28 @@ class Ball {
   }
 
   getReviveTime(game) {
-    const localReduction = this.upgrades.reviveSpeed * 1.1;
+    const localReduction = this.getUpgradeCurve(this.getUpgradeLevel("reviveSpeed"), 1.1, 0.045);
     const globalReduction = skillParam("reviveBoost", getSkillLevel(game.paddle, "reviveBoost"), "seconds", 0);
-    const speedPenalty = this.upgrades.speed * 0.4;
-    const damagePenalty = this.upgrades.damage * 0.5;
+    const speedPenalty = this.getUpgradeCurve(this.getUpgradeLevel("speed"), 0.4, 0.035);
+    const damagePenalty = this.getUpgradeCurve(this.upgrades.damage, 0.5, 0.045);
     return Math.max(2.5, this.baseReviveTime - localReduction - globalReduction + speedPenalty + damagePenalty);
   }
 
   getBaseSpeed() {
-    return 5 + this.upgrades.speed * 0.45;
+    return 5 + this.getUpgradeCurve(this.getUpgradeLevel("speed"), 0.45, 0.075);
+  }
+
+  getUpgradeLevel(key) {
+    const level = Math.max(0, Math.floor(Number(this.upgrades[key]) || 0));
+    const definition = typeof UPGRADE_DEFS !== "undefined" ? UPGRADE_DEFS[key] : null;
+    return definition ? Math.min(level, definition.max) : level;
+  }
+
+  getUpgradeCurve(level, earlyStep, lateStep, earlyLevels = 5) {
+    const safeLevel = Math.max(0, Math.floor(Number(level) || 0));
+    const early = Math.min(safeLevel, earlyLevels);
+    const late = Math.max(0, safeLevel - earlyLevels);
+    return early * earlyStep + late * lateStep;
   }
 
   getTargetSpeed() {
@@ -680,14 +739,19 @@ class Ball {
   drawMirror(ctx, level) {
     const length = Math.min(this.path.length, 8 + level * 3);
     ctx.save();
+    ctx.globalCompositeOperation = "lighter";
     for (let i = 0; i < length; i += 1) {
       const point = this.path[this.path.length - 1 - i];
-      const alpha = (1 - i / length) * (0.08 + level * 0.025);
+      const alpha = (1 - i / length) * (0.045 + level * 0.014);
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = SKILLS.mirror.color;
+      ctx.fillStyle = this.getPrimaryColor();
       ctx.beginPath();
-      ctx.arc(point.x - this.vx * 2, point.y + this.vy * 2, this.radius * 0.85, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, this.radius, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = alpha * 1.35;
+      ctx.strokeStyle = SKILLS.mirror.color;
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
     ctx.restore();
   }

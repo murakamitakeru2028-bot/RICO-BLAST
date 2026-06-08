@@ -3,11 +3,14 @@ const BALL_COLORS = ["#ff6b6b", "#4a9eff", "#ffcc4a", "#7cf5b2"];
 const BUMPER_UNLOCK_COST = 10000;
 const BUMPER_SKILL_CHOICE_RATE = 0.4;
 
+const UPGRADE_MAX_LEVEL = 100;
+const UPGRADE_LIMITED_LEVEL = 10;
+
 const UPGRADE_DEFS = {
-  speed: { label: "速度", baseCost: 10, max: 5 },
-  damage: { label: "ダメージ", baseCost: 10, max: 5 },
-  reviveSpeed: { label: "復活速度", baseCost: 10, max: 5 },
-  critRate: { label: "クリティカル率", baseCost: 10, max: 5 }
+  speed: { label: "SPEED", baseCost: 240, max: UPGRADE_LIMITED_LEVEL, costGrowth: 1.17, costStep: 60 },
+  damage: { label: "DAMAGE", baseCost: 360, max: UPGRADE_MAX_LEVEL, costGrowth: 1.175, costStep: 84 },
+  reviveSpeed: { label: "SPAWN", baseCost: 280, max: UPGRADE_LIMITED_LEVEL, costGrowth: 1.17, costStep: 70 },
+  critRate: { label: "CRITICAL", baseCost: 330, max: UPGRADE_MAX_LEVEL, costGrowth: 1.18, costStep: 78 }
 };
 
 const SKILL_LEVELS = {
@@ -21,8 +24,8 @@ const SKILL_LEVELS = {
   fragment: { count: [3, 4, 5, 6, 8], damage: [0.06, 0.07, 0.09, 0.10, 0.11] },
   detonator: { hits: [3, 3, 3, 3, 3], radius: [40, 52, 62, 72, 81], damage: [0.18, 0.22, 0.27, 0.32, 0.36] },
   shatter: { threshold: [0.15, 0.20, 0.25, 0.28, 0.32], radius: [80, 100, 130, 155, 176], damage: [0.06, 0.07, 0.09, 0.10, 0.11] },
-  poison: { duration: [4, 5, 7, 8, 10], interval: [0.5, 0.5, 0.5, 0.5, 0.5], damage: [0.03, 0.04, 0.05, 0.065, 0.08] },
-  afterburn: { radius: [25, 30, 35, 38, 42], duration: [3, 4, 5, 6, 8], damage: [0.03, 0.04, 0.05, 0.06, 0.08], projectileBuff: [1.25, 1.35, 1.45, 1.52, 1.65] },
+  poison: { duration: [8, 11, 14, 18, 24], interval: [0.5, 0.5, 0.5, 0.5, 0.5], damage: [0.035, 0.045, 0.058, 0.074, 0.092] },
+  afterburn: { radius: [32, 38, 45, 52, 60], duration: [3, 4, 5, 6, 8], damage: [0.045, 0.06, 0.078, 0.096, 0.125], projectileBuff: [1.25, 1.35, 1.45, 1.52, 1.65] },
   lightning: { count: [2, 2, 3, 4, 5], radius: [100, 130, 160, 185, 210], damage: [0.10, 0.13, 0.16, 0.19, 0.22] },
   blast: { height: [6, 8, 12, 15, 18], damage: [0.10, 0.13, 0.17, 0.21, 0.24] },
   impact: { multiplier: [1.4, 1.6, 1.75, 1.9, 2.0] },
@@ -30,10 +33,10 @@ const SKILL_LEVELS = {
   sprint: { duration: [0.8, 1, 1.3, 1.6, 2], speedMultiplier: [1.4, 1.55, 1.7, 1.85, 2.0] },
   teleporter: { chance: [0.25, 0.28, 0.30, 0.32, 0.35] },
   immortality: { saves: [1, 1, 2, 2, 3], boostMultiplier: [1.2, 1.35, 1.45, 1.55, 1.6], boostDuration: [0.5, 0.8, 1, 1, 1] },
-  mirror: { interval: [1.5, 1.2, 1.0, 0.7, 0.5], damage: [0.08, 0.10, 0.13, 0.16, 0.18] },
+  mirror: { duration: [0.75, 0.9, 1.05, 1.2, 1.35], hits: [2, 3, 3, 4, 5], damage: [0.10, 0.13, 0.16, 0.20, 0.24] },
   rebound: { multiplier: [1.3, 1.5, 1.65, 1.8, 2.0] },
   phantom: { count: [2, 3, 3, 4, 5], damage: [0.10, 0.13, 0.17, 0.21, 0.25], reviveLevel: [3, 3, 3, 3, 3] },
-  aura: { radius: [70, 80, 95, 110, 125], interval: [0.1, 0.1, 0.1, 0.1, 0.1], damage: [0.03, 0.045, 0.06, 0.075, 0.09] },
+  aura: { radius: [66, 76, 90, 104, 118], interval: [0.1, 0.1, 0.1, 0.1, 0.1], damage: [0.027, 0.041, 0.055, 0.069, 0.083] },
   berserker: { duration: [4, 6, 8, 9, 10], speedMultiplier: [1.1, 1.12, 1.15, 1.18, 1.2], damageMultiplier: [1.3, 1.45, 1.6, 1.7, 1.8] },
   cycle: { interval: [3, 2.8, 2.5, 2.2, 2], splashDamage: [0.08, 0.11, 0.14, 0.17, 0.20], lightningDamage: [0.10, 0.13, 0.16, 0.19, 0.22], damageMultiplier: [1.2, 1.25, 1.3, 1.4, 1.5] },
   expert: {
@@ -41,7 +44,7 @@ const SKILL_LEVELS = {
     avgLv3: [1.10, 1.18, 1.25, 1.32, 1.38],
     avgLv5: [1.15, 1.25, 1.35, 1.48, 1.60]
   },
-  echo: { radius: [30, 38, 46, 54, 62], duration: [3, 4, 6, 7, 8], damage: [0.04, 0.06, 0.08, 0.10, 0.12] },
+  echo: { radius: [28, 36, 44, 52, 60], duration: [3, 4, 5.5, 6.5, 7.5], damage: [0.018, 0.026, 0.034, 0.043, 0.052] },
   lastHit: { fixedBonus: [8, 12, 16, 20, 25], hpDivisor: [25, 20, 16, 13, 10] },
   scoreBoost: { multiplier: [1.2, 1.35, 1.5, 1.63, 1.75] },
   vampire: { percent: [0.02, 0.03, 0.035, 0.04, 0.05] },
@@ -54,13 +57,6 @@ const SKILL_LEVELS = {
   bumperFortify: { hp: [4, 5, 6, 8, 10] },
   bumperRecover: { seconds: [2.4, 2.0, 1.6, 1.2, 1.0] }
 };
-
-Object.assign(UPGRADE_DEFS, {
-  speed: { ...UPGRADE_DEFS.speed, costs: [120, 300, 800, 2200, 6200] },
-  damage: { ...UPGRADE_DEFS.damage, costs: [180, 450, 1200, 3400, 9600] },
-  reviveSpeed: { ...UPGRADE_DEFS.reviveSpeed, costs: [140, 360, 950, 2600, 7200] },
-  critRate: { ...UPGRADE_DEFS.critRate, costs: [160, 400, 1050, 3000, 8400] }
-});
 
 const SKILLS = {
   penetration: {
@@ -576,12 +572,18 @@ function makeStars(level, max = 5) {
 function getUpgradeCost(level, key) {
   const definition = UPGRADE_DEFS[key];
   if (!definition || level >= definition.max) return Infinity;
-  if (definition.costs && Number.isFinite(definition.costs[level])) return definition.costs[level];
-  return Infinity;
+  const safeLevel = Math.max(0, Math.floor(Number(level) || 0));
+  const base = Number(definition.baseCost) || 100;
+  const growth = Number(definition.costGrowth) || 1.14;
+  const step = Number(definition.costStep) || 40;
+  const scaled = (base + safeLevel * step + safeLevel * safeLevel * 3) * Math.pow(growth, safeLevel);
+  return Math.max(1, Math.floor(scaled));
 }
 
-function getSkillRerollCost() {
-  return 5;
+function getSkillRerollCost(count = null) {
+  const rerolls = count ?? (typeof Game !== "undefined" ? Game.skillRerollCount : 0);
+  const safeCount = Math.max(0, Math.floor(Number(rerolls) || 0));
+  return 5 + safeCount * 2 + Math.floor((safeCount * safeCount) / 8);
 }
 
 function getBallPurchaseCost(ballNumber) {
@@ -593,9 +595,10 @@ function getBallPurchaseCost(ballNumber) {
   return ballNumber <= BALL_MAX ? (costs[ballNumber] || Infinity) : Infinity;
 }
 
-function generateSkillChoices(balls, paddle, bumper) {
+function generateSkillChoices(balls, paddle, bumper, preferredBall = null) {
   const choices = [];
   const usedIds = new Set();
+  const targetBall = preferredBall && balls.includes(preferredBall) ? preferredBall : null;
   const pushUniqueChoice = (choice) => {
     if (!choice || usedIds.has(choice.id) || choices.length >= 3) return false;
     usedIds.add(choice.id);
@@ -605,7 +608,9 @@ function generateSkillChoices(balls, paddle, bumper) {
 
   const isChoiceAvailable = (id) => {
     const skill = SKILLS[id];
-    if (skill.type === "ball") return balls.some((ball) => canEquipSkill(ball, id));
+    if (skill.type === "ball") {
+      return targetBall ? canEquipSkill(targetBall, id) : balls.some((ball) => canEquipSkill(ball, id));
+    }
     if (skill.type === "bumper") return bumper && bumper.level > 0 && canEquipSkill(bumper, id);
     return canEquipSkill(paddle, id);
   };
