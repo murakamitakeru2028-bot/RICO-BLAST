@@ -87,6 +87,8 @@ const UI = {
   selectedSkillTarget: null,
   upgradeContext: null,
   onSkillTargetChanged: null,
+  slotRenderSignature: "",
+  paddleHpSignature: "",
 
   handlePlayingUiLaunch(ball = null) {
     if (typeof Game === "undefined" || typeof currentState === "undefined" || currentState !== STATE.PLAYING) {
@@ -176,6 +178,7 @@ const UI = {
     document.querySelectorAll(".screen").forEach((screen) => screen.classList.remove("active"));
     document.querySelectorAll(".game-panel").forEach((panel) => panel.classList.remove("active"));
     this.updateResumeCountdown(0, false);
+    this.invalidateSlotRender();
     if (state === STATE.TITLE) {
       document.getElementById("screen-title").classList.add("active");
       return;
@@ -187,10 +190,111 @@ const UI = {
     if (state === STATE.GAME_OVER) document.getElementById("screen-gameover").classList.add("active");
   },
 
+  invalidateSlotRender() {
+    this.slotRenderSignature = "";
+    this.paddleHpSignature = "";
+  },
+
+  targetSignature(target) {
+    if (!target) return "";
+    return `${target.type || ""}:${target.index ?? ""}`;
+  },
+
+  skillSignature(skill) {
+    if (!skill) return "-";
+    return `${skill.id || skill.name || ""}:${skill.level || 0}:${skill.color || ""}`;
+  },
+
+  entitySkillSignature(entity) {
+    if (!entity || !Array.isArray(entity.skills)) return "";
+    return entity.skills.map((skill) => this.skillSignature(skill)).join(",");
+  },
+
+  getSlotRenderSignature(balls, paddle, isUpgrade, isSkillSelect) {
+    const state = typeof currentState !== "undefined" ? currentState : "";
+    const game = typeof Game !== "undefined" ? Game : null;
+    const tokens = game ? Math.floor(Number(game.tokens || 0)) : 0;
+    const storeSlot = this.canBuyBallInCurrentPhase();
+    const parts = [
+      `state:${state}`,
+      `upgrade:${isUpgrade ? 1 : 0}`,
+      `skill:${isSkillSelect ? 1 : 0}`,
+      `tokens:${tokens}`,
+      `selU:${this.targetSignature(this.selectedUpgradeTarget)}`,
+      `selS:${this.targetSignature(this.selectedSkillTarget)}`
+    ];
+
+    for (let i = 0; i < BALL_MAX; i += 1) {
+      const ball = balls[i];
+      if (!ball) {
+        const buyState = this.getBallPurchaseSlotState(i, balls);
+        parts.push([
+          "empty",
+          i,
+          storeSlot ? 1 : 0,
+          buyState.buyable ? 1 : 0,
+          buyState.locked ? 1 : 0,
+          buyState.insufficient ? 1 : 0,
+          buyState.cost,
+          buyState.shortDetail || ""
+        ].join(":"));
+        continue;
+      }
+
+      const selected = (isUpgrade && this.isUpgradeTargetSelected("ball", i)) ||
+        (isSkillSelect && this.isSkillTargetSelected(i));
+      const reviveRemaining = Math.max(0, ball.reviveTimer || 0);
+      const reviveTotal = Math.max(reviveRemaining, ball.getReviveTime ? ball.getReviveTime(game) : reviveRemaining, 1);
+      const reviveFill = Math.round(clamp(1 - reviveRemaining / reviveTotal, 0, 1) * 100);
+      parts.push([
+        "ball",
+        i,
+        ball.alive ? 1 : 0,
+        ball.waitingLaunch ? 1 : 0,
+        Math.round(reviveRemaining * 10),
+        reviveFill,
+        ball.color || "",
+        selected ? 1 : 0,
+        this.entitySkillSignature(ball)
+      ].join(":"));
+    }
+
+    const paddleStars = Math.min(5, getTotalStars(paddle));
+    parts.push(`paddle:${paddleStars}:${this.entitySkillSignature(paddle)}`);
+
+    const bumper = game ? game.bumper : null;
+    if (bumper) {
+      const owned = bumper.isOwned ? bumper.isOwned() : (bumper.level || 0) > 0;
+      const buyState = this.getBumperSlotState(bumper);
+      parts.push([
+        "bumper",
+        owned ? 1 : 0,
+        bumper.level || 0,
+        Math.round(Number(bumper.hp || 0)),
+        Math.round(Number(bumper.maxHp || 0)),
+        bumper.broken ? 1 : 0,
+        Math.ceil(Number(bumper.reviveTimer || 0)),
+        buyState.buyable ? 1 : 0,
+        buyState.locked ? 1 : 0,
+        buyState.insufficient ? 1 : 0,
+        buyState.label || "",
+        buyState.detail || "",
+        this.entitySkillSignature(bumper)
+      ].join(":"));
+    }
+
+    return parts.join("|");
+  },
+
   renderSlots(balls, paddle) {
     this.updatePaddleHp(paddle);
     const isUpgrade = typeof currentState !== "undefined" && currentState === STATE.UPGRADE;
     const isSkillSelect = typeof currentState !== "undefined" && currentState === STATE.SKILL_SELECT;
+    const bumper = typeof Game !== "undefined" ? Game.bumper : null;
+    if (bumper && bumper.syncStats) bumper.syncStats();
+    const signature = this.getSlotRenderSignature(balls, paddle, isUpgrade, isSkillSelect);
+    if (signature === this.slotRenderSignature) return;
+    this.slotRenderSignature = signature;
     const slotBar = document.getElementById("slot-bar");
     if (slotBar) slotBar.classList.toggle("skill-select-mode", isSkillSelect);
     for (let i = 0; i < BALL_MAX; i += 1) {
@@ -326,8 +430,6 @@ const UI = {
 
     const bumperSlot = document.getElementById("slot-bumper");
     if (bumperSlot) {
-      const bumper = typeof Game !== "undefined" ? Game.bumper : null;
-      if (bumper && bumper.syncStats) bumper.syncStats();
       const firstBumper = bumper && bumper.skills ? bumper.skills[0] : null;
       const level = bumper ? (bumper.level || 0) : 0;
       const owned = bumper && bumper.isOwned ? bumper.isOwned() : level > 0;
@@ -605,7 +707,17 @@ const UI = {
     const maxHp = Math.max(1, paddle.maxHp || 1);
     const hp = clamp(paddle.hp || 0, 0, maxHp);
     const ratio = hp / maxHp;
-    fill.style.width = `${ratio * 100}%`;
+    const ratioPercent = Math.round(ratio * 100);
+    const signature = [
+      Math.ceil(hp),
+      Math.ceil(maxHp),
+      ratioPercent,
+      paddle.damageFlashTimer > 0 ? 1 : 0,
+      paddle.healFlashTimer > 0 ? 1 : 0
+    ].join("|");
+    if (signature === this.paddleHpSignature) return;
+    this.paddleHpSignature = signature;
+    fill.style.width = `${ratioPercent}%`;
     text.textContent = `${Math.ceil(hp)} / ${Math.ceil(maxHp)}`;
     root.classList.toggle("low", ratio <= 0.5 && ratio > 0.2);
     root.classList.toggle("danger", ratio <= 0.2);

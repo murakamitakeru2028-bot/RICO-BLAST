@@ -34,6 +34,9 @@ const Game = {
   inputReady: false,
   hudReady: false,
   hudNodes: null,
+  hudState: null,
+  slotUiTimer: 0,
+  slotUiInterval: 0.1,
   paused: false,
   blockSpawnTimer: 0,
   blockRowsSpawned: 0,
@@ -67,6 +70,7 @@ const Game = {
     this.score = 0;
     this.tokens = 0;
     this.combo = 0;
+    this.comboHudValue = 0;
     this.blocksTowardSkill = 0;
     this.totalBlocksDestroyed = 0;
     this.skillSelections = 0;
@@ -97,6 +101,7 @@ const Game = {
     if (hpTokenDisplay) hpTokenDisplay.classList.remove("pulse");
     this.lastTime = 0;
     this.playTime = 0;
+    this.slotUiTimer = 0;
     this.paused = false;
     this.awaitingStartClick = false;
     this.grantInvincibleOnStartClick = false;
@@ -139,6 +144,7 @@ const Game = {
       comboBanner: document.getElementById("combo-banner"),
       comboCount: document.getElementById("combo-count")
     };
+    this.hudState = {};
   },
 
   setupCanvas() {
@@ -883,7 +889,7 @@ const Game = {
       this.positionWaitingLaunchBalls();
       Effects.update(dt);
       this.updateHud();
-      UI.renderSlots(this.balls, this.paddle);
+      this.refreshSlotUi(dt);
       return;
     }
     this.playTime += dt;
@@ -909,6 +915,13 @@ const Game = {
     this.updateBlockSpawning(dt);
 
     this.updateHud();
+    this.refreshSlotUi(dt);
+  },
+
+  refreshSlotUi(dt = 0, force = false) {
+    this.slotUiTimer -= Math.max(0, dt || 0);
+    if (!force && this.slotUiTimer > 0) return;
+    this.slotUiTimer = this.slotUiInterval;
     UI.renderSlots(this.balls, this.paddle);
   },
 
@@ -2244,31 +2257,69 @@ const Game = {
 
   updateHud() {
     const nodes = this.hudNodes || {};
+    const state = this.hudState || (this.hudState = {});
     const scoreNode = nodes.score || document.getElementById("hud-score");
-    if (scoreNode) scoreNode.textContent = formatNumber(this.score);
+    if (scoreNode) {
+      const scoreText = formatNumber(this.score);
+      if (state.score !== scoreText) {
+        scoreNode.textContent = scoreText;
+        state.score = scoreText;
+      }
+    }
     const skillProgress = nodes.skillProgress || document.getElementById("hud-skill-progress");
     if (skillProgress) {
       const goal = Math.max(1, Math.floor(this.blocksPerSkill || 1));
       const current = this.rewardPending ? goal : clamp(Math.floor(this.blocksTowardSkill || 0), 0, goal);
       const percent = clamp((current / goal) * 100, 0, 100);
-      skillProgress.style.setProperty("--skill-progress-fill", `${percent}%`);
-      skillProgress.classList.toggle("ready", current >= goal || this.rewardPending);
-      skillProgress.setAttribute("aria-label", `SKILL ${current} / ${goal}`);
+      const fill = `${percent}%`;
+      const ready = current >= goal || this.rewardPending;
+      const label = `SKILL ${current} / ${goal}`;
+      if (state.skillFill !== fill) {
+        skillProgress.style.setProperty("--skill-progress-fill", fill);
+        state.skillFill = fill;
+      }
+      if (state.skillReady !== ready) {
+        skillProgress.classList.toggle("ready", ready);
+        state.skillReady = ready;
+      }
+      if (state.skillLabel !== label) {
+        skillProgress.setAttribute("aria-label", label);
+        state.skillLabel = label;
+      }
     }
     const hpToken = nodes.hpToken || document.getElementById("hp-token-count");
-    if (hpToken) hpToken.textContent = formatNumber(this.tokens);
+    if (hpToken) {
+      const tokenText = formatNumber(this.tokens);
+      if (state.tokens !== tokenText) {
+        hpToken.textContent = tokenText;
+        state.tokens = tokenText;
+      }
+    }
     const pauseButton = nodes.pauseButton || document.getElementById("btn-pause");
     if (pauseButton) {
-      pauseButton.textContent = this.isResuming() ? "READY" : (this.paused ? "PAUSED" : "STOP");
-      pauseButton.disabled = this.paused || this.isResuming();
-      pauseButton.classList.toggle("active", this.paused || this.isResuming());
+      const resuming = this.isResuming();
+      const pauseText = resuming ? "READY" : (this.paused ? "PAUSED" : "STOP");
+      const pauseDisabled = this.paused || resuming;
+      if (state.pauseText !== pauseText) {
+        pauseButton.textContent = pauseText;
+        state.pauseText = pauseText;
+      }
+      if (state.pauseDisabled !== pauseDisabled) {
+        pauseButton.disabled = pauseDisabled;
+        pauseButton.classList.toggle("active", pauseDisabled);
+        state.pauseDisabled = pauseDisabled;
+      }
     }
     const timerNode = nodes.timer || document.getElementById("hud-timer");
     if (timerNode) {
       const totalSecs = Math.floor(this.playTime || 0);
       const minutes = Math.floor(totalSecs / 60);
       const secs = totalSecs % 60;
-      timerNode.textContent = `${minutes}:${String(secs).padStart(2, "0")}`;
+      const timerText = `${minutes}:${String(secs).padStart(2, "0")}`;
+      if (state.timer !== timerText) {
+        timerNode.textContent = timerText;
+        state.timer = timerText;
+      }
     }
     this.updateComboHud();
   },

@@ -190,14 +190,16 @@ const TokenManager = {
       return;
     }
     if (this.tokens.length >= TOKEN_FX_LIMITS.max) return;
-    const start = this.gameToOverlay(game, x, y);
-    const target = this.getCollectionTarget(game, start.x, start.y);
+    const screenRect = this.ensureOverlay(game);
+    const start = this.gameToOverlay(game, x, y, screenRect);
+    const target = this.getCollectionTarget(game, start.x, start.y, screenRect);
     const quality = this.tokens.length >= TOKEN_FX_LIMITS.busy
       ? 0.45
       : this.tokens.length >= TOKEN_FX_LIMITS.soft
         ? 0.65
         : 1;
     this.tokens.push(new Token(start.x, start.y, amount, target.x, target.y, start.scale, quality));
+    if (this.overlayCanvas) this.overlayCanvas.style.display = "block";
   },
 
   ensureOverlay(game = null) {
@@ -235,8 +237,8 @@ const TokenManager = {
     return rect;
   },
 
-  gameToOverlay(game, x, y) {
-    const screenRect = this.ensureOverlay(game);
+  gameToOverlay(game, x, y, screenRect = null) {
+    screenRect = screenRect || this.ensureOverlay(game);
     if (!game || !game.canvas || !screenRect) return { x, y, scale: 1 };
     const canvasRect = game.canvas.getBoundingClientRect();
     if (canvasRect.width <= 0 || canvasRect.height <= 0 || game.width <= 0 || game.height <= 0) {
@@ -251,9 +253,9 @@ const TokenManager = {
     };
   },
 
-  getCollectionTarget(game, fallbackX = 0, fallbackY = 0) {
+  getCollectionTarget(game, fallbackX = 0, fallbackY = 0, screenRect = null) {
     if (typeof document === "undefined") return { x: fallbackX, y: fallbackY };
-    const screenRect = this.ensureOverlay(game);
+    screenRect = screenRect || this.ensureOverlay(game);
     const meter = document.getElementById("hp-token-display");
     const meterRect = meter ? meter.getBoundingClientRect() : null;
     if (!screenRect || !meterRect || meterRect.width <= 0 || meterRect.height <= 0) {
@@ -269,22 +271,43 @@ const TokenManager = {
   clear() {
     this.tokens = [];
     this.clearOverlay();
+    this.hideOverlay();
+  },
+
+  getOverlaySize() {
+    if (!this.overlayCanvas) return { width: 0, height: 0 };
+    return {
+      width: this.overlayCanvas.width / Math.max(1, this.overlayDpr || 1),
+      height: this.overlayCanvas.height / Math.max(1, this.overlayDpr || 1)
+    };
   },
 
   clearOverlay() {
     if (!this.overlayCanvas || !this.overlayCtx) return;
-    const rect = this.overlayCanvas.getBoundingClientRect();
-    this.overlayCtx.clearRect(0, 0, rect.width, rect.height);
+    const size = this.getOverlaySize();
+    this.overlayCtx.clearRect(0, 0, size.width, size.height);
+  },
+
+  hideOverlay() {
+    if (this.overlayCanvas) this.overlayCanvas.style.display = "none";
   },
 
   update(game, dt) {
     if (typeof Effects !== "undefined" && Effects.isEnabled && !Effects.isEnabled()) {
-      this.clear();
+      if (this.tokens.length > 0) {
+        this.clear();
+      } else {
+        this.hideOverlay();
+      }
+      return;
+    }
+    if (this.tokens.length === 0) {
+      this.hideOverlay();
       return;
     }
     const screenRect = this.ensureOverlay(game);
     const fallback = this.tokens[0] || { targetX: 0, targetY: 0 };
-    const target = this.getCollectionTarget(game, fallback.targetX, fallback.targetY);
+    const target = this.getCollectionTarget(game, fallback.targetX, fallback.targetY, screenRect);
     for (let i = this.tokens.length - 1; i >= 0; i -= 1) {
       const token = this.tokens[i];
       token.setTarget(target.x, target.y);
@@ -297,12 +320,16 @@ const TokenManager = {
         this.tokens.splice(i, 1);
       }
     }
+    if (this.tokens.length === 0) {
+      this.clearOverlay();
+      this.hideOverlay();
+    }
   },
 
   draw() {
-    if (!this.overlayCanvas || !this.overlayCtx) return;
-    const rect = this.overlayCanvas.getBoundingClientRect();
-    this.overlayCtx.clearRect(0, 0, rect.width, rect.height);
+    if (!this.overlayCanvas || !this.overlayCtx || this.tokens.length === 0) return;
+    const size = this.getOverlaySize();
+    this.overlayCtx.clearRect(0, 0, size.width, size.height);
     if (typeof Effects !== "undefined" && Effects.isEnabled && !Effects.isEnabled()) return;
     const lite = this.tokens.length >= TOKEN_FX_LIMITS.busy;
     for (const token of this.tokens) token.draw(this.overlayCtx, lite || token.quality < 0.7);

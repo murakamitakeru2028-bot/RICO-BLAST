@@ -26,6 +26,7 @@ const Effects = {
   rewardFlash: null,
   enabled: true,
   enabledLoaded: false,
+  lastCanvasTransform: "",
 
   loadSettings() {
     if (this.enabledLoaded) return this.enabled;
@@ -68,6 +69,15 @@ const Effects = {
 
   isOverloaded() {
     return this.getLoadScore() >= EFFECT_LIMITS.totalOverload;
+  },
+
+  hasVisualEffects() {
+    return this.particles.length > 0 ||
+      this.rings.length > 0 ||
+      this.bursts.length > 0 ||
+      this.damageNumbers.length > 0 ||
+      this.popups.length > 0 ||
+      !!this.rewardFlash;
   },
 
   getEffectScale(important = false) {
@@ -684,11 +694,12 @@ const Effects = {
 
   update(dt) {
     if (!this.isEnabled()) {
-      if (this.particles.length || this.rings.length || this.bursts.length || this.damageNumbers.length || this.popups.length || this.rewardFlash) {
+      if (this.hasVisualEffects()) {
         this.clear();
       }
       return;
     }
+    if (!this.hasVisualEffects() && this.shakeDuration <= 0) return;
     const frame = dt * 60;
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
       const particle = this.particles[i];
@@ -766,13 +777,18 @@ const Effects = {
 
   applyCanvasTransform(x, y) {
     if (typeof Game === "undefined" || !Game.canvas) return;
-    Game.canvas.style.transform = x || y ? `translate(${x}px, ${y}px)` : "";
+    const transform = x || y ? `translate(${x}px, ${y}px)` : "";
+    if (transform === this.lastCanvasTransform) return;
+    Game.canvas.style.transform = transform;
+    this.lastCanvasTransform = transform;
   },
 
   draw(ctx) {
     if (!this.isEnabled()) return;
-    const busy = this.isBusy();
-    const overloaded = this.isOverloaded();
+    if (!this.hasVisualEffects()) return;
+    const load = this.getLoadScore();
+    const busy = load >= EFFECT_LIMITS.totalBusy;
+    const overloaded = load >= EFFECT_LIMITS.totalOverload;
     for (const burst of this.bursts) {
       const progress = 1 - burst.life / burst.maxLife;
       const alpha = clamp(burst.life / burst.maxLife, 0, 1);
