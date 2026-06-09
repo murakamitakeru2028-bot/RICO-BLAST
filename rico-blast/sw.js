@@ -1,4 +1,4 @@
-const CACHE_NAME = "rico-blast-pwa-v2";
+const CACHE_NAME = "rico-blast-pwa-v9";
 
 const APP_SHELL = [
   "./",

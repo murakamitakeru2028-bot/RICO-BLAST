@@ -3,6 +3,7 @@ const AccountManager = {
   currentAccountKey: "ricoBlast_currentAccountId",
   localClientIdKey: "ricoBlast_googleClientId",
   initializedClientId: null,
+  googleScriptPromise: null,
 
   getClientId() {
     const configured = typeof window !== "undefined" && window.RICO_BLAST_GOOGLE_CLIENT_ID
@@ -154,10 +155,50 @@ const AccountManager = {
     return accounts[account.id];
   },
 
+  loadGoogleSignIn() {
+    if (typeof google !== "undefined" && google.accounts && google.accounts.id) {
+      return Promise.resolve(true);
+    }
+    if (this.googleScriptPromise) return this.googleScriptPromise;
+
+    this.googleScriptPromise = new Promise((resolve, reject) => {
+      if (typeof document === "undefined") {
+        reject(new Error("Google sign-in script is unavailable"));
+        return;
+      }
+
+      const existing = document.querySelector('script[data-rico-google-signin="true"]');
+      if (existing) {
+        existing.addEventListener("load", () => resolve(true), { once: true });
+        existing.addEventListener("error", () => reject(new Error("Google sign-in script failed to load")), { once: true });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.dataset.ricoGoogleSignin = "true";
+      script.onload = () => resolve(true);
+      script.onerror = () => {
+        this.googleScriptPromise = null;
+        reject(new Error("Google sign-in script failed to load"));
+      };
+      document.head.appendChild(script);
+    });
+
+    return this.googleScriptPromise;
+  },
+
   renderGoogleButton(container, onSuccess, onError) {
     if (!container || !this.isConfigured()) return false;
     if (typeof google === "undefined" || !google.accounts || !google.accounts.id) {
-      if (onError) onError("Google sign-in script is not ready");
+      this.loadGoogleSignIn()
+        .then(() => this.renderGoogleButton(container, onSuccess, onError))
+        .catch((error) => {
+          if (onError) onError(error.message);
+        });
+      if (onError) onError("Loading Google");
       return false;
     }
     const clientId = this.getClientId();

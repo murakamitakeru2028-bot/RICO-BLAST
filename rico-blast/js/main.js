@@ -9,14 +9,35 @@ const STATE = {
 
 let currentState = STATE.TITLE;
 let animationId = null;
+let resizeFrame = null;
+
+function shouldRunGameLoop() {
+  return currentState !== STATE.TITLE && currentState !== STATE.GAME_OVER;
+}
+
+function startGameLoop() {
+  if (!animationId) {
+    animationId = requestAnimationFrame(gameLoop);
+  }
+}
+
+function stopGameLoop() {
+  if (animationId) {
+    cancelAnimationFrame(animationId);
+    animationId = null;
+  }
+}
 
 function setState(newState) {
   currentState = newState;
   UI.updateScreens(newState);
   if (Game) Game.lastTime = 0;
+  if (shouldRunGameLoop()) startGameLoop();
+  else stopGameLoop();
 }
 
 function gameLoop(timestamp) {
+  animationId = null;
   if (currentState === STATE.PLAYING) {
     Game.update(timestamp);
     Game.render();
@@ -24,21 +45,24 @@ function gameLoop(timestamp) {
     Game.updatePaused(timestamp);
     Game.render();
   }
-  animationId = requestAnimationFrame(gameLoop);
+  if (shouldRunGameLoop()) startGameLoop();
 }
 
 function init() {
+  stopGameLoop();
   UI.initTitle();
   AudioSystem.bindUiSounds();
   setState(STATE.TITLE);
-  if (animationId) cancelAnimationFrame(animationId);
-  animationId = requestAnimationFrame(gameLoop);
 }
 
 window.addEventListener("load", init);
 window.addEventListener("resize", () => {
-  if (currentState !== STATE.TITLE && Game.canvas) {
-    Game.setupCanvas();
-    Game.render();
-  }
+  if (resizeFrame) return;
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = null;
+    if (currentState !== STATE.TITLE && Game.canvas) {
+      Game.setupCanvas();
+      Game.render();
+    }
+  });
 });

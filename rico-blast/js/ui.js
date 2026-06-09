@@ -175,6 +175,7 @@ const UI = {
   updateScreens(state) {
     document.querySelectorAll(".screen").forEach((screen) => screen.classList.remove("active"));
     document.querySelectorAll(".game-panel").forEach((panel) => panel.classList.remove("active"));
+    this.updateResumeCountdown(0, false);
     if (state === STATE.TITLE) {
       document.getElementById("screen-title").classList.add("active");
       return;
@@ -749,12 +750,22 @@ const UI = {
     return `<span class="skill-stars" aria-label="LEVEL ${current} OF ${safeMax}">${stars}</span>`;
   },
 
+  skillNameFontSize(name = "") {
+    const widthUnits = Array.from(String(name)).reduce((total, char) => {
+      return total + (/^[\x20-\x7e]$/.test(char) ? 0.58 : 1);
+    }, 0);
+    if (widthUnits >= 9) return "10.5px";
+    if (widthUnits >= 7.5) return "11.2px";
+    return "12.5px";
+  },
+
   skillCardHtml(choice) {
     const isAdd = choice.type === "addBall";
     const description = this.skillDescription(choice);
     const level = clamp(choice.level || 1, 1, 5);
     const category = isAdd ? "NEW BALL" : choice.category.toUpperCase();
     const levelBadge = isAdd ? `<span class="skill-stars skill-stars-empty">NEW</span>` : this.skillStarLevelHtml(level);
+    const nameSize = this.skillNameFontSize(choice.name);
     return `
       <button class="skill-card ${isAdd ? "add-ball" : ""}" style="--skill-color:${choice.color}" type="button">
         <span class="skill-card-head">
@@ -763,7 +774,7 @@ const UI = {
         </span>
         <span class="skill-copy">
           <span class="skill-name-row">
-            <span class="skill-name">${choice.name}</span>
+            <span class="skill-name" style="--skill-name-size:${nameSize}">${choice.name}</span>
             ${levelBadge}
           </span>
           <span class="skill-description">${description}</span>
@@ -1338,6 +1349,7 @@ const UI = {
       ? Game.getInputSettings()
       : { mode: "direct", sensitivity: 1 };
     const sensitivity = Math.round((settings.sensitivity || 1) * 100);
+    const effectsEnabled = typeof Effects === "undefined" || !Effects.isEnabled || Effects.isEnabled();
     title.innerHTML = `
       <div class="simple-card settings-card">
         <p class="simple-title">SETTINGS</p>
@@ -1356,14 +1368,24 @@ const UI = {
             <span>SENSITIVITY</span>
             <b id="setting-sensitivity-value">${sensitivity}%</b>
           </div>
-          <input id="setting-sensitivity" class="settings-range" type="range" min="60" max="160" step="5" value="${sensitivity}">
+          <input id="setting-sensitivity" class="settings-range" type="range" min="60" max="250" step="5" value="${sensitivity}">
+        </div>
+        <div class="settings-group">
+          <div class="settings-head">
+            <span>EFFECTS</span>
+            <b id="setting-effects-label">${effectsEnabled ? "ON" : "OFF"}</b>
+          </div>
+          <div class="settings-segmented" role="group" aria-label="effects">
+            <button class="settings-option effect-option ${effectsEnabled ? "active" : ""}" type="button" data-effects="on">ON</button>
+            <button class="settings-option effect-option ${!effectsEnabled ? "active" : ""}" type="button" data-effects="off">OFF</button>
+          </div>
         </div>
         <div class="simple-divider"></div>
         <button class="btn-sub" id="btn-back">BACK</button>
       </div>
     `;
-    const applySettings = () => {
-      const active = title.querySelector(".settings-option.active");
+    const applyInputSettings = () => {
+      const active = title.querySelector(".settings-option[data-mode].active");
       const range = document.getElementById("setting-sensitivity");
       const next = typeof Game !== "undefined" && Game.setInputSettings
         ? Game.setInputSettings({
@@ -1376,16 +1398,134 @@ const UI = {
       if (label) label.textContent = next.mode === "drag" ? "DRAG" : "DIRECT";
       if (value) value.textContent = `${Math.round(next.sensitivity * 100)}%`;
     };
-    title.querySelectorAll(".settings-option").forEach((button) => {
+    title.querySelectorAll(".settings-option[data-mode]").forEach((button) => {
       button.addEventListener("click", () => {
-        title.querySelectorAll(".settings-option").forEach((node) => node.classList.remove("active"));
+        title.querySelectorAll(".settings-option[data-mode]").forEach((node) => node.classList.remove("active"));
         button.classList.add("active");
         AudioSystem.playUiOpen();
-        applySettings();
+        applyInputSettings();
       });
     });
-    document.getElementById("setting-sensitivity").addEventListener("input", applySettings);
+    title.querySelectorAll(".effect-option").forEach((button) => {
+      button.addEventListener("click", () => {
+        title.querySelectorAll(".effect-option").forEach((node) => node.classList.remove("active"));
+        button.classList.add("active");
+        const enabled = button.dataset.effects !== "off";
+        if (typeof Effects !== "undefined" && Effects.setEnabled) Effects.setEnabled(enabled);
+        if (!enabled && typeof TokenManager !== "undefined" && TokenManager.clear) TokenManager.clear();
+        const label = document.getElementById("setting-effects-label");
+        if (label) label.textContent = enabled ? "ON" : "OFF";
+        AudioSystem.playUiOpen();
+      });
+    });
+    document.getElementById("setting-sensitivity").addEventListener("input", applyInputSettings);
     document.getElementById("btn-back").addEventListener("click", () => this.initTitle());
+  },
+
+  showPauseSettings() {
+    const panel = document.getElementById("screen-pause-settings");
+    const root = document.getElementById("pause-settings-card");
+    if (!panel || !root) return;
+    const settings = typeof Game !== "undefined" && Game.getInputSettings
+      ? Game.getInputSettings()
+      : { mode: "direct", sensitivity: 1 };
+    const sensitivity = Math.round((settings.sensitivity || 1) * 100);
+    const effectsEnabled = typeof Effects === "undefined" || !Effects.isEnabled || Effects.isEnabled();
+    root.innerHTML = `
+      <p class="overlay-kicker">PAUSED</p>
+      <h2 class="overlay-title">SETTINGS</h2>
+      <div class="settings-group">
+        <div class="settings-head">
+          <span>CONTROL</span>
+          <b id="pause-setting-control-label">${settings.mode === "drag" ? "DRAG" : "DIRECT"}</b>
+        </div>
+        <div class="settings-segmented" role="group" aria-label="control mode">
+          <button class="settings-option ${settings.mode === "direct" ? "active" : ""}" type="button" data-pause-mode="direct">DIRECT</button>
+          <button class="settings-option ${settings.mode === "drag" ? "active" : ""}" type="button" data-pause-mode="drag">DRAG</button>
+        </div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-head">
+          <span>SENSITIVITY</span>
+          <b id="pause-setting-sensitivity-value">${sensitivity}%</b>
+        </div>
+        <input id="pause-setting-sensitivity" class="settings-range" type="range" min="60" max="250" step="5" value="${sensitivity}">
+      </div>
+      <div class="settings-group">
+        <div class="settings-head">
+          <span>EFFECTS</span>
+          <b id="pause-setting-effects-label">${effectsEnabled ? "ON" : "OFF"}</b>
+        </div>
+        <div class="settings-segmented" role="group" aria-label="effects">
+          <button class="settings-option pause-effect-option ${effectsEnabled ? "active" : ""}" type="button" data-pause-effects="on">ON</button>
+          <button class="settings-option pause-effect-option ${!effectsEnabled ? "active" : ""}" type="button" data-pause-effects="off">OFF</button>
+        </div>
+      </div>
+      <button class="btn-resume-game" id="btn-resume-game" type="button">RESUME</button>
+    `;
+    panel.classList.add("active");
+
+    const applyInputSettings = () => {
+      const active = root.querySelector(".settings-option[data-pause-mode].active");
+      const range = document.getElementById("pause-setting-sensitivity");
+      const next = typeof Game !== "undefined" && Game.setInputSettings
+        ? Game.setInputSettings({
+          mode: active ? active.dataset.pauseMode : "direct",
+          sensitivity: Number(range ? range.value : 100) / 100
+        })
+        : { mode: "direct", sensitivity: 1 };
+      const label = document.getElementById("pause-setting-control-label");
+      const value = document.getElementById("pause-setting-sensitivity-value");
+      if (label) label.textContent = next.mode === "drag" ? "DRAG" : "DIRECT";
+      if (value) value.textContent = `${Math.round(next.sensitivity * 100)}%`;
+    };
+
+    root.querySelectorAll(".settings-option[data-pause-mode]").forEach((button) => {
+      button.addEventListener("click", () => {
+        root.querySelectorAll(".settings-option[data-pause-mode]").forEach((node) => node.classList.remove("active"));
+        button.classList.add("active");
+        AudioSystem.playUiOpen();
+        applyInputSettings();
+      });
+    });
+    root.querySelectorAll(".pause-effect-option").forEach((button) => {
+      button.addEventListener("click", () => {
+        root.querySelectorAll(".pause-effect-option").forEach((node) => node.classList.remove("active"));
+        button.classList.add("active");
+        const enabled = button.dataset.pauseEffects !== "off";
+        if (typeof Effects !== "undefined" && Effects.setEnabled) Effects.setEnabled(enabled);
+        if (!enabled && typeof TokenManager !== "undefined" && TokenManager.clear) TokenManager.clear();
+        const label = document.getElementById("pause-setting-effects-label");
+        if (label) label.textContent = enabled ? "ON" : "OFF";
+        AudioSystem.playUiOpen();
+      });
+    });
+    document.getElementById("pause-setting-sensitivity").addEventListener("input", applyInputSettings);
+    document.getElementById("btn-resume-game").addEventListener("click", () => {
+      AudioSystem.playUiSuccess();
+      if (typeof Game !== "undefined" && Game.beginResumeCountdown) Game.beginResumeCountdown();
+    });
+  },
+
+  hidePauseSettings() {
+    const panel = document.getElementById("screen-pause-settings");
+    if (panel) panel.classList.remove("active");
+  },
+
+  updateResumeCountdown(value, active) {
+    const root = document.getElementById("resume-countdown");
+    const node = document.getElementById("resume-countdown-value");
+    if (!root || !node) return;
+    if (!active) {
+      root.classList.remove("active", "pop");
+      root.setAttribute("aria-hidden", "true");
+      return;
+    }
+    node.textContent = String(Math.max(1, Math.ceil(value || 1)));
+    root.setAttribute("aria-hidden", "false");
+    root.classList.remove("pop");
+    void root.offsetWidth;
+    root.classList.add("active", "pop");
   },
 
   accountSkillSummaryHtml(run) {

@@ -33,6 +33,7 @@ const Game = {
   zones: [],
   inputReady: false,
   hudReady: false,
+  hudNodes: null,
   paused: false,
   blockSpawnTimer: 0,
   blockRowsSpawned: 0,
@@ -47,6 +48,9 @@ const Game = {
     mode: "direct",
     sensitivity: 1
   },
+  resumeCountdown: 0,
+  resumeCountdownDuration: 3,
+  resumeCountdownLastValue: 0,
   inputDrag: {
     active: false,
     pointerId: null,
@@ -58,6 +62,7 @@ const Game = {
     clearTimeout(this.phaseTimeout);
     this.canvas = document.getElementById("game-canvas");
     this.ctx = this.canvas.getContext("2d");
+    this.cacheHudNodes();
     this.difficultyLevel = 1;
     this.score = 0;
     this.tokens = 0;
@@ -75,19 +80,20 @@ const Game = {
     this.tokenGainTimeout = null;
     clearTimeout(this.scoreGainTimeout);
     this.scoreGainTimeout = null;
-    const tokenGainNode = document.getElementById("token-gain-text");
+    const nodes = this.hudNodes || {};
+    const tokenGainNode = nodes.tokenGain;
     if (tokenGainNode) {
       tokenGainNode.textContent = "+0 TOKEN";
       tokenGainNode.classList.remove("active");
     }
-    const scoreGainNode = document.getElementById("score-gain-text");
+    const scoreGainNode = nodes.scoreGain;
     if (scoreGainNode) {
       scoreGainNode.textContent = "+0";
       scoreGainNode.classList.remove("active", "boosted");
     }
-    const hpTokenNode = document.getElementById("hp-token-count");
+    const hpTokenNode = nodes.hpToken;
     if (hpTokenNode) hpTokenNode.textContent = "0";
-    const hpTokenDisplay = document.getElementById("hp-token-display");
+    const hpTokenDisplay = nodes.hpTokenDisplay;
     if (hpTokenDisplay) hpTokenDisplay.classList.remove("pulse");
     this.lastTime = 0;
     this.playTime = 0;
@@ -116,6 +122,23 @@ const Game = {
     Effects.clear();
     this.updateHud();
     UI.renderSlots(this.balls, this.paddle);
+  },
+
+  cacheHudNodes() {
+    const scoreBlock = document.getElementById("hud-score-block");
+    this.hudNodes = {
+      score: document.getElementById("hud-score"),
+      scoreBlock,
+      scoreGain: document.getElementById("score-gain-text"),
+      skillProgress: document.getElementById("hud-skill-progress"),
+      hpToken: document.getElementById("hp-token-count"),
+      hpTokenDisplay: document.getElementById("hp-token-display"),
+      tokenGain: document.getElementById("token-gain-text"),
+      pauseButton: document.getElementById("btn-pause"),
+      timer: document.getElementById("hud-timer"),
+      comboBanner: document.getElementById("combo-banner"),
+      comboCount: document.getElementById("combo-count")
+    };
   },
 
   setupCanvas() {
@@ -149,11 +172,11 @@ const Game = {
     };
     const getSettings = () => this.getInputSettings();
     const updateDirect = (clientX) => {
-      if (!this.paddle || currentState !== STATE.PLAYING || this.paused) return;
+      if (!this.paddle || this.isInputLocked()) return;
       this.paddle.onTouch(clamp(toGameX(clientX), 0, this.width));
     };
     const startDrag = (clientX, pointerId = null) => {
-      if (!this.paddle || currentState !== STATE.PLAYING || this.paused) return;
+      if (!this.paddle || this.isInputLocked()) return;
       const settings = getSettings();
       if (settings.mode === "drag") {
         this.inputDrag.active = true;
@@ -165,7 +188,7 @@ const Game = {
       updateDirect(clientX);
     };
     const updateInput = (clientX, pointerId = null) => {
-      if (!this.paddle || currentState !== STATE.PLAYING || this.paused) return;
+      if (!this.paddle || this.isInputLocked()) return;
       const settings = getSettings();
       if (settings.mode !== "drag") {
         updateDirect(clientX);
@@ -195,8 +218,10 @@ const Game = {
           }
         }
         if (launch) {
-          this.releaseStartClickHold();
-          this.launchNextReadyBall();
+          if (!this.isInputLocked()) {
+            this.releaseStartClickHold();
+            this.launchNextReadyBall();
+          }
         }
       });
       zone.addEventListener("pointermove", (event) => {
@@ -211,8 +236,10 @@ const Game = {
           AudioSystem.unlock();
           if (event.touches[0]) startDrag(event.touches[0].clientX);
           if (launch) {
-            this.releaseStartClickHold();
-            this.launchNextReadyBall();
+            if (!this.isInputLocked()) {
+              this.releaseStartClickHold();
+              this.launchNextReadyBall();
+            }
           }
         }, { passive: !prevent });
         zone.addEventListener("touchmove", (event) => {
@@ -248,7 +275,7 @@ const Game = {
     }
     this.inputSettings = {
       mode: mode === "drag" ? "drag" : "direct",
-      sensitivity: clamp(Number.isFinite(sensitivity) ? sensitivity : defaults.sensitivity, 0.6, 1.6)
+      sensitivity: clamp(Number.isFinite(sensitivity) ? sensitivity : defaults.sensitivity, 0.6, 2.5)
     };
     this.inputSettingsLoaded = true;
     return this.inputSettings;
@@ -262,7 +289,7 @@ const Game = {
     const current = this.getInputSettings();
     this.inputSettings = {
       mode: nextSettings.mode === "drag" ? "drag" : (nextSettings.mode === "direct" ? "direct" : current.mode),
-      sensitivity: clamp(Number.isFinite(Number(nextSettings.sensitivity)) ? Number(nextSettings.sensitivity) : current.sensitivity, 0.6, 1.6)
+      sensitivity: clamp(Number.isFinite(Number(nextSettings.sensitivity)) ? Number(nextSettings.sensitivity) : current.sensitivity, 0.6, 2.5)
     };
     this.inputDrag.active = false;
     this.inputDrag.pointerId = null;
@@ -279,26 +306,58 @@ const Game = {
     if (this.hudReady) return;
     const pauseButton = document.getElementById("btn-pause");
     if (pauseButton) {
+      pauseButton.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
       pauseButton.addEventListener("click", (event) => {
-        if (currentState === STATE.PLAYING) {
-          event.preventDefault();
-          this.releaseStartClickHold();
-          this.launchNextReadyBall();
-          return;
-        }
-        this.togglePause();
+        event.preventDefault();
+        event.stopPropagation();
+        this.openPauseSettings();
       });
     }
     this.hudReady = true;
   },
 
-  togglePause() {
-    if (currentState !== STATE.PLAYING) return;
+  isResuming() {
+    return this.resumeCountdown > 0;
+  },
+
+  isInputLocked() {
+    return currentState !== STATE.PLAYING || this.paused || this.isResuming();
+  },
+
+  openPauseSettings() {
+    if (currentState !== STATE.PLAYING || this.paused || this.isResuming()) return;
     AudioSystem.unlock();
-    const wasPaused = this.paused;
-    this.paused = !this.paused;
-    if (wasPaused && !this.paused) this.holdUntilStartClick({ grantInvincible: true });
+    this.paused = true;
+    this.resumeCountdown = 0;
+    this.resumeCountdownLastValue = 0;
+    this.inputDrag.active = false;
+    this.inputDrag.pointerId = null;
     this.lastTime = 0;
+    UI.showPauseSettings();
+    this.updateHud();
+  },
+
+  beginResumeCountdown() {
+    if (currentState !== STATE.PLAYING || !this.paused) return;
+    this.paused = false;
+    this.resumeCountdown = this.resumeCountdownDuration;
+    this.resumeCountdownLastValue = Math.ceil(this.resumeCountdown);
+    this.inputDrag.active = false;
+    this.inputDrag.pointerId = null;
+    this.lastTime = 0;
+    UI.hidePauseSettings();
+    UI.updateResumeCountdown(this.resumeCountdownLastValue, true);
+    this.updateHud();
+  },
+
+  finishResumeCountdown() {
+    this.resumeCountdown = 0;
+    this.resumeCountdownLastValue = 0;
+    this.lastTime = 0;
+    UI.updateResumeCountdown(0, false);
     this.updateHud();
   },
 
@@ -308,6 +367,8 @@ const Game = {
     this.combo = 0;
     this.lastTime = 0;
     this.paused = false;
+    this.resumeCountdown = 0;
+    this.resumeCountdownLastValue = 0;
     this.awaitingStartClick = false;
     this.grantInvincibleOnStartClick = false;
     this.rewardPending = false;
@@ -337,6 +398,8 @@ const Game = {
     this.combo = 0;
     this.lastTime = 0;
     this.paused = false;
+    this.resumeCountdown = 0;
+    this.resumeCountdownLastValue = 0;
     this.awaitingStartClick = false;
     this.grantInvincibleOnStartClick = false;
     this.rewardPending = false;
@@ -800,6 +863,21 @@ const Game = {
       this.updateHud();
       return;
     }
+    if (this.isResuming()) {
+      this.resumeCountdown = Math.max(0, this.resumeCountdown - dt);
+      const value = Math.max(1, Math.ceil(this.resumeCountdown));
+      if (value !== this.resumeCountdownLastValue) {
+        this.resumeCountdownLastValue = value;
+        UI.updateResumeCountdown(value, this.resumeCountdown > 0);
+      }
+      if (this.resumeCountdown <= 0) {
+        this.finishResumeCountdown();
+      } else {
+        Effects.update(dt);
+        this.updateHud();
+      }
+      return;
+    }
     if (this.awaitingStartClick) {
       this.paddle.update(this, dt);
       this.positionWaitingLaunchBalls();
@@ -1038,9 +1116,9 @@ const Game = {
 
   drawBackground(ctx) {
     ctx.save();
-    ctx.fillStyle = "#0d0d1a";
+    ctx.fillStyle = "#080812";
     ctx.fillRect(0, 0, this.width, this.height);
-    ctx.strokeStyle = "rgba(255,255,255,0.035)";
+    ctx.strokeStyle = "rgba(255,255,255,0.028)";
     ctx.lineWidth = 1;
     for (let y = 64; y < this.height; y += 64) {
       ctx.beginPath();
@@ -1917,7 +1995,7 @@ const Game = {
     const gained = Math.max(0, Math.floor(points));
     this.score += gained;
     if (gained > 0) this.showScoreGain(gained, multiplier);
-    const hud = document.getElementById("hud-score");
+    const hud = this.hudNodes?.score || document.getElementById("hud-score");
     if (hud) {
       hud.textContent = formatNumber(this.score);
       hud.classList.remove("token-bump");
@@ -1933,14 +2011,15 @@ const Game = {
   },
 
   getScoreGainNode() {
-    const root = document.getElementById("hud-score-block");
+    const root = this.hudNodes?.scoreBlock || document.getElementById("hud-score-block");
     if (!root) return null;
-    let node = document.getElementById("score-gain-text");
+    let node = this.hudNodes?.scoreGain || document.getElementById("score-gain-text");
     if (!node) {
       node = document.createElement("span");
       node.id = "score-gain-text";
       node.setAttribute("aria-hidden", "true");
       root.appendChild(node);
+      if (this.hudNodes) this.hudNodes.scoreGain = node;
     }
     return node;
   },
@@ -1959,7 +2038,7 @@ const Game = {
     this.scoreGainTimeout = setTimeout(() => {
       this.scoreGainAmount = 0;
       this.scoreGainBoosted = false;
-      const currentNode = document.getElementById("score-gain-text");
+      const currentNode = this.hudNodes?.scoreGain || document.getElementById("score-gain-text");
       if (currentNode) currentNode.classList.remove("active", "boosted");
     }, 720);
   },
@@ -1967,9 +2046,9 @@ const Game = {
   addTokens(amount) {
     const gained = Math.max(0, Math.floor(amount));
     this.tokens += gained;
-    const hpToken = document.getElementById("hp-token-count");
+    const hpToken = this.hudNodes?.hpToken || document.getElementById("hp-token-count");
     if (hpToken) hpToken.textContent = formatNumber(this.tokens);
-    const hpTokenDisplay = document.getElementById("hp-token-display");
+    const hpTokenDisplay = this.hudNodes?.hpTokenDisplay || document.getElementById("hp-token-display");
     if (hpTokenDisplay) {
       hpTokenDisplay.classList.remove("pulse");
       void hpTokenDisplay.offsetWidth;
@@ -1981,7 +2060,7 @@ const Game = {
   showTokenGain(amount) {
     if (amount <= 0) return;
     this.tokenGainAmount += amount;
-    const node = document.getElementById("token-gain-text");
+    const node = this.hudNodes?.tokenGain || document.getElementById("token-gain-text");
     if (!node) return;
     node.textContent = `+${formatNumber(this.tokenGainAmount)} TOKEN`;
     node.classList.remove("active");
@@ -1990,7 +2069,7 @@ const Game = {
     clearTimeout(this.tokenGainTimeout);
     this.tokenGainTimeout = setTimeout(() => {
       this.tokenGainAmount = 0;
-      const currentNode = document.getElementById("token-gain-text");
+      const currentNode = this.hudNodes?.tokenGain || document.getElementById("token-gain-text");
       if (currentNode) currentNode.classList.remove("active");
     }, 720);
   },
@@ -2164,9 +2243,10 @@ const Game = {
   },
 
   updateHud() {
-    const scoreNode = document.getElementById("hud-score");
+    const nodes = this.hudNodes || {};
+    const scoreNode = nodes.score || document.getElementById("hud-score");
     if (scoreNode) scoreNode.textContent = formatNumber(this.score);
-    const skillProgress = document.getElementById("hud-skill-progress");
+    const skillProgress = nodes.skillProgress || document.getElementById("hud-skill-progress");
     if (skillProgress) {
       const goal = Math.max(1, Math.floor(this.blocksPerSkill || 1));
       const current = this.rewardPending ? goal : clamp(Math.floor(this.blocksTowardSkill || 0), 0, goal);
@@ -2175,14 +2255,15 @@ const Game = {
       skillProgress.classList.toggle("ready", current >= goal || this.rewardPending);
       skillProgress.setAttribute("aria-label", `SKILL ${current} / ${goal}`);
     }
-    const hpToken = document.getElementById("hp-token-count");
+    const hpToken = nodes.hpToken || document.getElementById("hp-token-count");
     if (hpToken) hpToken.textContent = formatNumber(this.tokens);
-    const pauseButton = document.getElementById("btn-pause");
+    const pauseButton = nodes.pauseButton || document.getElementById("btn-pause");
     if (pauseButton) {
-      pauseButton.textContent = this.paused ? "PLAY" : "STOP";
-      pauseButton.classList.toggle("active", this.paused);
+      pauseButton.textContent = this.isResuming() ? "READY" : (this.paused ? "PAUSED" : "STOP");
+      pauseButton.disabled = this.paused || this.isResuming();
+      pauseButton.classList.toggle("active", this.paused || this.isResuming());
     }
-    const timerNode = document.getElementById("hud-timer");
+    const timerNode = nodes.timer || document.getElementById("hud-timer");
     if (timerNode) {
       const totalSecs = Math.floor(this.playTime || 0);
       const minutes = Math.floor(totalSecs / 60);
@@ -2193,8 +2274,9 @@ const Game = {
   },
 
   updateComboHud() {
-    const banner = document.getElementById("combo-banner");
-    const countNode = document.getElementById("combo-count");
+    const nodes = this.hudNodes || {};
+    const banner = nodes.comboBanner || document.getElementById("combo-banner");
+    const countNode = nodes.comboCount || document.getElementById("combo-count");
     if (!banner || !countNode) return;
     const combo = Math.max(0, this.combo || 0);
     const visible = currentState === STATE.PLAYING && combo >= 2;

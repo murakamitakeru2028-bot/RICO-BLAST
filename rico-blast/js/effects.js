@@ -1,3 +1,19 @@
+const EFFECT_LIMITS = {
+  particles: 180,
+  particlesSoft: 120,
+  rings: 34,
+  ringsSoft: 22,
+  bursts: 14,
+  damageNumbers: 44,
+  damageSoft: 30,
+  popups: 5,
+  totalSoft: 190,
+  totalBusy: 260,
+  totalOverload: 340
+};
+
+const EFFECTS_STORAGE_KEY = "ricoBlast_effectsEnabled";
+
 const Effects = {
   particles: [],
   bursts: [],
@@ -8,47 +24,139 @@ const Effects = {
   shakeDuration: 0,
   shakeElapsed: 0,
   rewardFlash: null,
+  enabled: true,
+  enabledLoaded: false,
+
+  loadSettings() {
+    if (this.enabledLoaded) return this.enabled;
+    try {
+      this.enabled = localStorage.getItem(EFFECTS_STORAGE_KEY) !== "0";
+    } catch (error) {
+      this.enabled = true;
+    }
+    this.enabledLoaded = true;
+    return this.enabled;
+  },
+
+  isEnabled() {
+    return this.loadSettings();
+  },
+
+  setEnabled(enabled) {
+    this.enabled = enabled !== false;
+    this.enabledLoaded = true;
+    try {
+      localStorage.setItem(EFFECTS_STORAGE_KEY, this.enabled ? "1" : "0");
+    } catch (error) {
+      // Effects still toggle for the current session when storage is blocked.
+    }
+    if (!this.enabled) this.clear();
+    return this.enabled;
+  },
+
+  getLoadScore() {
+    return this.particles.length +
+      this.rings.length * 4 +
+      this.bursts.length * 8 +
+      this.damageNumbers.length * 3 +
+      this.popups.length * 5;
+  },
+
+  isBusy() {
+    return this.getLoadScore() >= EFFECT_LIMITS.totalBusy;
+  },
+
+  isOverloaded() {
+    return this.getLoadScore() >= EFFECT_LIMITS.totalOverload;
+  },
+
+  getEffectScale(important = false) {
+    const load = this.getLoadScore();
+    if (load >= EFFECT_LIMITS.totalOverload) return important ? 0.5 : 0.24;
+    if (load >= EFFECT_LIMITS.totalBusy) return important ? 0.66 : 0.38;
+    if (load >= EFFECT_LIMITS.totalSoft) return important ? 0.82 : 0.58;
+    if (this.particles.length >= EFFECT_LIMITS.particlesSoft) return important ? 0.86 : 0.68;
+    return 1;
+  },
+
+  shouldSkipMinor(important = false) {
+    if (important) return false;
+    const load = this.getLoadScore();
+    if (load >= EFFECT_LIMITS.totalOverload) return Math.random() < 0.75;
+    if (load >= EFFECT_LIMITS.totalBusy) return Math.random() < 0.45;
+    if (this.particles.length >= EFFECT_LIMITS.particles) return Math.random() < 0.6;
+    return false;
+  },
+
+  scaledCount(base, important = false, min = 0) {
+    return Math.max(min, Math.round(base * this.getEffectScale(important)));
+  },
 
   spawnBlockBreak(x, y, color, options = {}) {
+    if (!this.isEnabled()) return;
     const special = !!options.special;
+    const scale = this.getEffectScale(special);
+    if (!special && scale < 0.35 && this.particles.length > EFFECT_LIMITS.particlesSoft) {
+      if (this.rings.length < EFFECT_LIMITS.ringsSoft) {
+        this.rings.push({
+          x,
+          y,
+          color,
+          radius: 0,
+          maxRadius: 24,
+          lineWidth: 1.6,
+          life: 0.2,
+          maxLife: 0.2
+        });
+      }
+      this.trimEffects();
+      return;
+    }
+
     const combo = Math.max(0, options.combo || 0);
     const intensity = clamp(1 + Math.min(combo, 40) / 80 + (special ? 0.42 : 0), 1, 1.85);
     const accent = special ? "#ffe66b" : (options.accent || "#f6fbff");
-    const count = Math.round(randomInt(22, 31) * intensity);
+    const count = this.scaledCount(randomInt(22, 31) * intensity, special, special ? 10 : 4);
 
-    this.bursts.push({
-      x,
-      y,
-      color,
-      accent,
-      radius: 4,
-      maxRadius: 30 + 12 * intensity,
-      life: 0.2 + 0.04 * intensity,
-      maxLife: 0.2 + 0.04 * intensity,
-      opacity: special ? 0.95 : 0.72
-    });
-    this.rings.push({
-      x,
-      y,
-      color: accent,
-      radius: 4,
-      maxRadius: 16 + 8 * intensity,
-      lineWidth: special ? 3 : 2.4,
-      life: 0.14,
-      maxLife: 0.14
-    });
-    this.rings.push({
-      x,
-      y,
-      color,
-      radius: 0,
-      maxRadius: 32 + 11 * intensity,
-      lineWidth: 2.2,
-      life: 0.28 + 0.06 * intensity,
-      maxLife: 0.28 + 0.06 * intensity
-    });
+    if (this.bursts.length < EFFECT_LIMITS.bursts || special) {
+      this.bursts.push({
+        x,
+        y,
+        color,
+        accent,
+        radius: 4,
+        maxRadius: 30 + 12 * intensity,
+        life: 0.2 + 0.04 * intensity,
+        maxLife: 0.2 + 0.04 * intensity,
+        opacity: special ? 0.95 : 0.72
+      });
+    }
+    if (this.rings.length < EFFECT_LIMITS.rings || special) {
+      this.rings.push({
+        x,
+        y,
+        color: accent,
+        radius: 4,
+        maxRadius: 16 + 8 * intensity,
+        lineWidth: special ? 3 : 2.4,
+        life: 0.14,
+        maxLife: 0.14
+      });
+    }
+    if (scale > 0.45 && this.rings.length < EFFECT_LIMITS.rings) {
+      this.rings.push({
+        x,
+        y,
+        color,
+        radius: 0,
+        maxRadius: 32 + 11 * intensity,
+        lineWidth: 2.2,
+        life: 0.28 + 0.06 * intensity,
+        maxLife: 0.28 + 0.06 * intensity
+      });
+    }
 
-    const sparkCount = Math.round(randomInt(9, 14) * intensity);
+    const sparkCount = this.scaledCount(randomInt(9, 14) * intensity, special, special ? 4 : 0);
     for (let i = 0; i < sparkCount; i += 1) {
       const angle = rand(0, Math.PI * 2);
       const speed = rand(5.8, 10.5) * intensity;
@@ -94,8 +202,9 @@ const Effects = {
     }
 
     if (special) {
-      for (let i = 0; i < 8; i += 1) {
-        const angle = (Math.PI * 2 * i) / 8 + rand(-0.08, 0.08);
+      const rayCount = this.scaledCount(8, true, 4);
+      for (let i = 0; i < rayCount; i += 1) {
+        const angle = (Math.PI * 2 * i) / rayCount + rand(-0.08, 0.08);
         const speed = rand(7.5, 11);
         this.particles.push({
           x,
@@ -122,17 +231,22 @@ const Effects = {
   },
 
   spawnImpactSpark(x, y, color) {
-    this.rings.push({
-      x,
-      y,
-      color,
-      radius: 0,
-      maxRadius: 12,
-      lineWidth: 1.4,
-      life: 0.12,
-      maxLife: 0.12
-    });
-    for (let i = 0; i < 5; i += 1) {
+    if (!this.isEnabled()) return;
+    if (this.shouldSkipMinor()) return;
+    const count = this.scaledCount(5, false, 2);
+    if (this.rings.length < EFFECT_LIMITS.rings) {
+      this.rings.push({
+        x,
+        y,
+        color,
+        radius: 0,
+        maxRadius: 12,
+        lineWidth: 1.4,
+        life: 0.12,
+        maxLife: 0.12
+      });
+    }
+    for (let i = 0; i < count; i += 1) {
       const angle = rand(0, Math.PI * 2);
       const speed = rand(2.2, 5.2);
       this.particles.push({
@@ -156,17 +270,22 @@ const Effects = {
   },
 
   showArmorDeflect(x, y) {
-    this.rings.push({
-      x,
-      y,
-      color: "#ff4a4a",
-      radius: 2,
-      maxRadius: 16,
-      lineWidth: 1.6,
-      life: 0.1,
-      maxLife: 0.1
-    });
-    for (let i = 0; i < 6; i += 1) {
+    if (!this.isEnabled()) return;
+    const important = true;
+    const count = this.scaledCount(6, important, 3);
+    if (this.rings.length < EFFECT_LIMITS.rings || important) {
+      this.rings.push({
+        x,
+        y,
+        color: "#ff4a4a",
+        radius: 2,
+        maxRadius: 16,
+        lineWidth: 1.6,
+        life: 0.1,
+        maxLife: 0.1
+      });
+    }
+    for (let i = 0; i < count; i += 1) {
       const angle = rand(Math.PI * 0.85, Math.PI * 2.15);
       const speed = rand(2.2, 5.8);
       this.particles.push({
@@ -191,7 +310,10 @@ const Effects = {
   },
 
   spawnBlockRegen(x, y) {
-    for (let i = 0; i < 5; i += 1) {
+    if (!this.isEnabled()) return;
+    if (this.shouldSkipMinor()) return;
+    const count = this.scaledCount(5, false, 2);
+    for (let i = 0; i < count; i += 1) {
       this.particles.push({
         x: x + rand(-11, 11),
         y: y + rand(-4, 5),
@@ -214,17 +336,22 @@ const Effects = {
   },
 
   spawnBlockSpawn(x, y) {
-    this.rings.push({
-      x,
-      y,
-      color: "#aa66ff",
-      radius: 0,
-      maxRadius: 24,
-      lineWidth: 1.4,
-      life: 0.3,
-      maxLife: 0.3
-    });
-    for (let i = 0; i < 10; i += 1) {
+    if (!this.isEnabled()) return;
+    if (this.shouldSkipMinor()) return;
+    const count = this.scaledCount(10, false, 3);
+    if (this.rings.length < EFFECT_LIMITS.rings) {
+      this.rings.push({
+        x,
+        y,
+        color: "#aa66ff",
+        radius: 0,
+        maxRadius: 24,
+        lineWidth: 1.4,
+        life: 0.3,
+        maxLife: 0.3
+      });
+    }
+    for (let i = 0; i < count; i += 1) {
       const angle = rand(0, Math.PI * 2);
       const speed = rand(1.4, 4.8);
       this.particles.push({
@@ -253,28 +380,37 @@ const Effects = {
   },
 
   showTokenCollect(x, y, amount = 1) {
+    if (!this.isEnabled()) return;
     const strength = clamp(amount, 1, 5);
-    this.rings.push({
-      x,
-      y,
-      color: "#f0c040",
-      radius: 0,
-      maxRadius: 18 + strength * 2,
-      lineWidth: 1.4,
-      life: 0.24,
-      maxLife: 0.24
-    });
-    this.rings.push({
-      x,
-      y,
-      color: "#fff3b0",
-      radius: 4,
-      maxRadius: 8 + strength,
-      lineWidth: 2,
-      life: 0.12,
-      maxLife: 0.12
-    });
-    for (let i = 0; i < 7 + strength; i += 1) {
+    const important = amount >= 3;
+    if (this.shouldSkipMinor(important)) return;
+    const scale = this.getEffectScale(important);
+    if (this.rings.length < EFFECT_LIMITS.rings || important) {
+      this.rings.push({
+        x,
+        y,
+        color: "#f0c040",
+        radius: 0,
+        maxRadius: 18 + strength * 2,
+        lineWidth: 1.4,
+        life: 0.24,
+        maxLife: 0.24
+      });
+    }
+    if (scale > 0.45 && this.rings.length < EFFECT_LIMITS.rings) {
+      this.rings.push({
+        x,
+        y,
+        color: "#fff3b0",
+        radius: 4,
+        maxRadius: 8 + strength,
+        lineWidth: 2,
+        life: 0.12,
+        maxLife: 0.12
+      });
+    }
+    const count = this.scaledCount(7 + strength, important, important ? 4 : 2);
+    for (let i = 0; i < count; i += 1) {
       const angle = -Math.PI / 2 + rand(-0.9, 0.9);
       const speed = rand(1.8, 4.8);
       this.particles.push({
@@ -292,11 +428,15 @@ const Effects = {
         maxLife: 0.5
       });
     }
+    this.trimEffects();
   },
 
   shakeScreen(amplitude, duration) {
-    this.shakeAmount = Math.max(this.shakeAmount, amplitude);
-    this.shakeDuration = Math.max(this.shakeDuration, duration);
+    if (!this.isEnabled()) return;
+    if (this.isOverloaded() && amplitude < 1.5) return;
+    const scale = this.isBusy() ? 0.65 : 1;
+    this.shakeAmount = Math.max(this.shakeAmount, amplitude * scale);
+    this.shakeDuration = Math.max(this.shakeDuration, duration * scale);
     this.shakeElapsed = 0;
   },
 
@@ -305,8 +445,15 @@ const Effects = {
   },
 
   showDamageNumber(x, y, amount, color = "#f6fbff", source = "hit") {
+    if (!this.isEnabled()) return;
     const value = Math.max(1, Math.round(amount));
     const heavy = value >= 25 || source === "ball";
+    const important = source === "paddle" || value >= 1000;
+    if (!important && this.damageNumbers.length >= EFFECT_LIMITS.damageSoft) {
+      const keepChance = source === "ball" ? 0.45 : 0.25;
+      if (Math.random() > keepChance) return;
+    }
+    if (!important && this.damageNumbers.length >= EFFECT_LIMITS.damageNumbers) return;
     this.damageNumbers.push({
       text: `-${value}`,
       x: x + rand(-8, 8),
@@ -319,13 +466,17 @@ const Effects = {
       maxLife: heavy ? 0.62 : 0.5,
       pop: 1.28
     });
-    if (this.damageNumbers.length > 80) this.damageNumbers.splice(0, this.damageNumbers.length - 80);
+    if (this.damageNumbers.length > EFFECT_LIMITS.damageNumbers) {
+      this.damageNumbers.splice(0, this.damageNumbers.length - EFFECT_LIMITS.damageNumbers);
+    }
   },
 
   showScoreNumber(x, y, amount, multiplier = 1) {
+    if (!this.isEnabled()) return;
     const value = Math.max(1, Math.round(amount));
     const label = typeof formatNumber === "function" ? formatNumber(value) : String(value);
     const bonus = Math.max(1, multiplier || 1);
+    if (bonus <= 1.001 && this.damageNumbers.length >= EFFECT_LIMITS.damageNumbers) return;
     this.damageNumbers.push({
       text: `+${label}`,
       x: x + rand(-5, 5),
@@ -338,7 +489,7 @@ const Effects = {
       maxLife: bonus > 1.001 ? 0.76 : 0.62,
       pop: bonus > 1.001 ? 1.42 : 1.28
     });
-    if (bonus > 1.001) {
+    if (bonus > 1.001 && !this.isOverloaded()) {
       this.damageNumbers.push({
         text: `x${bonus.toFixed(2)}`,
         x: x + rand(-4, 4),
@@ -352,10 +503,13 @@ const Effects = {
         pop: 1.22
       });
     }
-    if (this.damageNumbers.length > 90) this.damageNumbers.splice(0, this.damageNumbers.length - 90);
+    if (this.damageNumbers.length > EFFECT_LIMITS.damageNumbers) {
+      this.damageNumbers.splice(0, this.damageNumbers.length - EFFECT_LIMITS.damageNumbers);
+    }
   },
 
   showRewardReady() {
+    if (!this.isEnabled()) return;
     this.rewardFlash = {
       life: 0.65,
       maxLife: 0.65
@@ -363,7 +517,8 @@ const Effects = {
   },
 
   showBallRevive(x, y, color) {
-    this.rings.push({
+    if (!this.isEnabled()) return;
+    if (this.rings.length < EFFECT_LIMITS.rings || !this.isOverloaded()) this.rings.push({
       x,
       y,
       color,
@@ -373,20 +528,26 @@ const Effects = {
       life: 0.4,
       maxLife: 0.4
     });
+    this.trimEffects();
   },
 
   showBumperHit(x, y, width) {
-    this.rings.push({
-      x,
-      y,
-      color: "#67d8ff",
-      radius: 0,
-      maxRadius: 16,
-      lineWidth: 1.2,
-      life: 0.16,
-      maxLife: 0.16
-    });
-    for (let i = 0; i < 7; i += 1) {
+    if (!this.isEnabled()) return;
+    if (this.shouldSkipMinor()) return;
+    const count = this.scaledCount(7, false, 2);
+    if (this.rings.length < EFFECT_LIMITS.rings) {
+      this.rings.push({
+        x,
+        y,
+        color: "#67d8ff",
+        radius: 0,
+        maxRadius: 16,
+        lineWidth: 1.2,
+        life: 0.16,
+        maxLife: 0.16
+      });
+    }
+    for (let i = 0; i < count; i += 1) {
       const direction = Math.random() < 0.5 ? -1 : 1;
       this.particles.push({
         x: clamp(x + rand(-22, 22), 0, width),
@@ -403,10 +564,12 @@ const Effects = {
         maxLife: 0.34
       });
     }
+    this.trimEffects();
   },
 
   showBumperRevive(x, y) {
-    this.rings.push({
+    if (!this.isEnabled()) return;
+    if (this.rings.length < EFFECT_LIMITS.rings || !this.isOverloaded()) this.rings.push({
       x,
       y,
       color: "#7cf5b2",
@@ -416,9 +579,12 @@ const Effects = {
       life: 0.28,
       maxLife: 0.28
     });
+    this.trimEffects();
   },
 
   showBumperBroken(x, y, width) {
+    if (!this.isEnabled()) return;
+    const count = this.scaledCount(34, true, 12);
     this.popups.push({
       text: "BUMPER BROKEN!",
       x: width / 2,
@@ -428,7 +594,7 @@ const Effects = {
       life: 0.9,
       maxLife: 0.9
     });
-    for (let i = 0; i < 34; i += 1) {
+    for (let i = 0; i < count; i += 1) {
       const angle = rand(Math.PI * 1.05, Math.PI * 1.95);
       const speed = rand(1.4, 6.8);
       this.particles.push({
@@ -446,9 +612,11 @@ const Effects = {
         maxLife: 0.62
       });
     }
+    this.trimEffects();
   },
 
   showPaddleDamage(x, y, amount) {
+    if (!this.isEnabled()) return;
     this.damageNumbers.push({
       text: `-${Math.max(1, Math.ceil(amount))}`,
       x: x + rand(-8, 8),
@@ -461,7 +629,8 @@ const Effects = {
       maxLife: 0.62,
       pop: 1.3
     });
-    for (let i = 0; i < 12; i += 1) {
+    const count = this.scaledCount(12, true, 6);
+    for (let i = 0; i < count; i += 1) {
       this.particles.push({
         x: x + rand(-26, 26),
         y: y + rand(-2, 4),
@@ -477,10 +646,14 @@ const Effects = {
         maxLife: 0.44
       });
     }
+    this.trimEffects();
   },
 
   showPaddleHeal(x, y) {
-    for (let i = 0; i < 10; i += 1) {
+    if (!this.isEnabled()) return;
+    if (this.shouldSkipMinor()) return;
+    const count = this.scaledCount(10, false, 3);
+    for (let i = 0; i < count; i += 1) {
       this.particles.push({
         x: x + rand(-30, 30),
         y: y + rand(-4, 4),
@@ -496,17 +669,29 @@ const Effects = {
         maxLife: 0.38
       });
     }
+    this.trimEffects();
   },
 
   trimEffects() {
-    if (this.particles.length > 260) this.particles.splice(0, this.particles.length - 260);
-    if (this.rings.length > 54) this.rings.splice(0, this.rings.length - 54);
-    if (this.bursts.length > 24) this.bursts.splice(0, this.bursts.length - 24);
+    if (this.particles.length > EFFECT_LIMITS.particles) this.particles.splice(0, this.particles.length - EFFECT_LIMITS.particles);
+    if (this.rings.length > EFFECT_LIMITS.rings) this.rings.splice(0, this.rings.length - EFFECT_LIMITS.rings);
+    if (this.bursts.length > EFFECT_LIMITS.bursts) this.bursts.splice(0, this.bursts.length - EFFECT_LIMITS.bursts);
+    if (this.damageNumbers.length > EFFECT_LIMITS.damageNumbers) {
+      this.damageNumbers.splice(0, this.damageNumbers.length - EFFECT_LIMITS.damageNumbers);
+    }
+    if (this.popups.length > EFFECT_LIMITS.popups) this.popups.splice(0, this.popups.length - EFFECT_LIMITS.popups);
   },
 
   update(dt) {
+    if (!this.isEnabled()) {
+      if (this.particles.length || this.rings.length || this.bursts.length || this.damageNumbers.length || this.popups.length || this.rewardFlash) {
+        this.clear();
+      }
+      return;
+    }
     const frame = dt * 60;
-    for (const particle of [...this.particles]) {
+    for (let i = this.particles.length - 1; i >= 0; i -= 1) {
+      const particle = this.particles[i];
       particle.life -= dt;
       particle.x += particle.vx * frame;
       particle.y += particle.vy * frame;
@@ -515,37 +700,41 @@ const Effects = {
       const gravity = Number.isFinite(particle.gravity) ? particle.gravity : 0.1;
       particle.vx *= Math.pow(drag, frame);
       particle.vy = particle.vy * Math.pow(drag, frame) + gravity * frame;
-      if (particle.life <= 0) this.remove(this.particles, particle);
+      if (particle.life <= 0) this.particles.splice(i, 1);
     }
 
-    for (const burst of [...this.bursts]) {
+    for (let i = this.bursts.length - 1; i >= 0; i -= 1) {
+      const burst = this.bursts[i];
       burst.life -= dt;
       const progress = 1 - burst.life / burst.maxLife;
       burst.radius = progress * (burst.maxRadius || 36);
-      if (burst.life <= 0) this.remove(this.bursts, burst);
+      if (burst.life <= 0) this.bursts.splice(i, 1);
     }
 
-    for (const popup of [...this.popups]) {
+    for (let i = this.popups.length - 1; i >= 0; i -= 1) {
+      const popup = this.popups[i];
       popup.life -= dt;
       popup.y -= 30 * dt / popup.maxLife;
-      if (popup.life <= 0) this.remove(this.popups, popup);
+      if (popup.life <= 0) this.popups.splice(i, 1);
     }
 
-    for (const number of [...this.damageNumbers]) {
+    for (let i = this.damageNumbers.length - 1; i >= 0; i -= 1) {
+      const number = this.damageNumbers[i];
       number.life -= dt;
       number.x += number.vx * frame;
       number.y += number.vy * frame;
       number.vx *= Math.pow(0.9, frame);
       number.vy += 0.045 * frame;
       number.pop = 1 + Math.max(0, number.pop - 1) * Math.pow(0.72, frame);
-      if (number.life <= 0) this.remove(this.damageNumbers, number);
+      if (number.life <= 0) this.damageNumbers.splice(i, 1);
     }
 
-    for (const ring of [...this.rings]) {
+    for (let i = this.rings.length - 1; i >= 0; i -= 1) {
+      const ring = this.rings[i];
       ring.life -= dt;
       const progress = 1 - ring.life / ring.maxLife;
       ring.radius = progress * (ring.maxRadius || 40);
-      if (ring.life <= 0) this.remove(this.rings, ring);
+      if (ring.life <= 0) this.rings.splice(i, 1);
     }
 
     if (this.rewardFlash) {
@@ -581,32 +770,41 @@ const Effects = {
   },
 
   draw(ctx) {
+    if (!this.isEnabled()) return;
+    const busy = this.isBusy();
+    const overloaded = this.isOverloaded();
     for (const burst of this.bursts) {
       const progress = 1 - burst.life / burst.maxLife;
       const alpha = clamp(burst.life / burst.maxLife, 0, 1);
       const radius = Math.max(2, burst.radius || burst.maxRadius * progress);
-      const gradient = ctx.createRadialGradient(burst.x, burst.y, 0, burst.x, burst.y, radius);
-      gradient.addColorStop(0, burst.accent || "#ffffff");
-      gradient.addColorStop(0.22, burst.color);
-      gradient.addColorStop(1, "rgba(255,255,255,0)");
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       ctx.globalAlpha = Math.min(1, alpha * (burst.opacity || 0.72) * (1.2 - progress * 0.35));
-      ctx.fillStyle = gradient;
+      if (busy) {
+        ctx.fillStyle = burst.color;
+      } else {
+        const gradient = ctx.createRadialGradient(burst.x, burst.y, 0, burst.x, burst.y, radius);
+        gradient.addColorStop(0, burst.accent || "#ffffff");
+        gradient.addColorStop(0.22, burst.color);
+        gradient.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = gradient;
+      }
       ctx.beginPath();
       ctx.arc(burst.x, burst.y, radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
 
-    for (const particle of this.particles) {
+    for (let i = 0; i < this.particles.length; i += 1) {
+      if (overloaded && i % 2 === 1) continue;
+      const particle = this.particles[i];
       const alpha = clamp(particle.life / particle.maxLife, 0, 1);
       ctx.save();
-      if (particle.blend) ctx.globalCompositeOperation = "lighter";
+      if (!busy && particle.blend) ctx.globalCompositeOperation = "lighter";
       ctx.globalAlpha = Math.min(1, alpha * (particle.alphaBoost || 1));
       ctx.translate(particle.x, particle.y);
       ctx.rotate(particle.rotation || 0);
-      if (particle.glow) {
+      if (!busy && particle.glow) {
         ctx.shadowBlur = particle.shape === "spark" ? 12 : 8;
         ctx.shadowColor = particle.color;
       }
@@ -658,8 +856,10 @@ const Effects = {
       ctx.textBaseline = "middle";
       ctx.lineWidth = 4;
       ctx.strokeStyle = "rgba(12, 10, 8, 0.92)";
-      ctx.shadowBlur = 10 * (1 - progress);
-      ctx.shadowColor = number.color;
+      if (!busy) {
+        ctx.shadowBlur = 10 * (1 - progress);
+        ctx.shadowColor = number.color;
+      }
       ctx.strokeText(number.text, 0, 0);
       ctx.fillStyle = number.color;
       ctx.fillText(number.text, 0, 0);
@@ -676,8 +876,10 @@ const Effects = {
       ctx.textBaseline = "middle";
       ctx.lineWidth = 5;
       ctx.strokeStyle = "rgba(4, 8, 14, 0.94)";
-      ctx.shadowBlur = 14 * (1 - progress);
-      ctx.shadowColor = popup.color;
+      if (!busy) {
+        ctx.shadowBlur = 14 * (1 - progress);
+        ctx.shadowColor = popup.color;
+      }
       ctx.strokeText(popup.text, popup.x, popup.y);
       ctx.fillStyle = popup.color;
       ctx.fillText(popup.text, popup.x, popup.y);

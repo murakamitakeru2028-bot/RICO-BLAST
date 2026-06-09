@@ -471,9 +471,9 @@ Block.types = {
     hpMultiplier: 1,
     tokenMultiplier: 1,
     colors: {
-      body: "#2a2a3e",
-      empty: "#151523",
-      accent: "#2a2a3e"
+      body: "#34344a",
+      empty: "#1d1d2e",
+      accent: "#34344a"
     }
   },
   heavyS: {
@@ -485,8 +485,8 @@ Block.types = {
     borderWidth: 4,
     borderColor: "rgba(255,255,255,0.4)",
     colors: {
-      body: "#2a2a3e",
-      empty: "#151523",
+      body: "#34344a",
+      empty: "#1d1d2e",
       accent: "#f6fbff"
     }
   },
@@ -499,8 +499,8 @@ Block.types = {
     borderWidth: 4,
     borderColor: "rgba(255,255,255,0.4)",
     colors: {
-      body: "#2a2a3e",
-      empty: "#151523",
+      body: "#34344a",
+      empty: "#1d1d2e",
       accent: "#f6fbff"
     }
   },
@@ -513,8 +513,8 @@ Block.types = {
     borderWidth: 4,
     borderColor: "rgba(255,255,255,0.4)",
     colors: {
-      body: "#2a2a3e",
-      empty: "#151523",
+      body: "#34344a",
+      empty: "#1d1d2e",
       accent: "#f6fbff"
     }
   },
@@ -537,8 +537,8 @@ Block.types = {
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.3)",
     colors: {
-      body: "#2a2a3e",
-      empty: "#151523",
+      body: "#34344a",
+      empty: "#1d1d2e",
       accent: "#f6fbff"
     }
   },

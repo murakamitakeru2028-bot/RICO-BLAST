@@ -1,7 +1,14 @@
+const TOKEN_FX_LIMITS = {
+  soft: 20,
+  busy: 30,
+  max: 38
+};
+
 class Token {
-  constructor(x, y, amount = 1, targetX = 0, targetY = 0, scale = 1) {
+  constructor(x, y, amount = 1, targetX = 0, targetY = 0, scale = 1, quality = 1) {
     this.amount = Math.max(1, Math.floor(amount));
     this.scale = clamp(scale, 0.82, 1.4);
+    this.quality = clamp(quality, 0.45, 1);
     this.x = x + rand(-3, 3) * this.scale;
     this.y = y + rand(-2, 2) * this.scale;
     this.originX = this.x;
@@ -21,6 +28,8 @@ class Token {
     this.orbit = rand(-1, 1);
     this.trail = [{ x: this.x, y: this.y, life: 1 }];
     this.trailTimer = 0;
+    this.trailInterval = this.quality < 0.7 ? 0.038 : 0.018;
+    this.trailLimit = this.quality < 0.7 ? 7 : 15;
   }
 
   setTarget(x, y) {
@@ -74,12 +83,15 @@ class Token {
     this.rotation += this.spin * (1 + travel * 1.4) * frame;
     this.trailTimer -= dt;
     if (this.trailTimer <= 0) {
-      this.trailTimer = 0.018;
+      this.trailTimer = this.trailInterval;
       this.trail.push({ x: this.x, y: this.y, life: 1 });
-      if (this.trail.length > 15) this.trail.shift();
+      if (this.trail.length > this.trailLimit) this.trail.shift();
     }
-    for (const point of this.trail) point.life -= dt * 2.4;
-    this.trail = this.trail.filter((point) => point.life > 0);
+    for (let i = this.trail.length - 1; i >= 0; i -= 1) {
+      const point = this.trail[i];
+      point.life -= dt * 2.4;
+      if (point.life <= 0) this.trail.splice(i, 1);
+    }
 
     const arriveRadius = Math.max(8, 9 * this.scale);
     if (dist < arriveRadius || travel >= 1) {
@@ -90,7 +102,7 @@ class Token {
     }
   }
 
-  draw(ctx) {
+  draw(ctx, lite = false) {
     const travel = this.getTravel();
     const enter = clamp(this.age / 0.12, 0, 1);
     const exit = clamp((1 - travel) / 0.12, 0, 1);
@@ -98,9 +110,9 @@ class Token {
     if (alpha <= 0) return;
 
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    if (!lite) ctx.globalCompositeOperation = "lighter";
 
-    if (this.trail.length > 1) {
+    if (!lite && this.trail.length > 1) {
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       for (let i = 1; i < this.trail.length; i += 1) {
@@ -131,8 +143,10 @@ class Token {
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rotation);
     ctx.scale(pop, pop);
-    ctx.shadowBlur = this.amount >= 100 ? 12 : this.amount >= 20 ? 9 : 6;
-    ctx.shadowColor = "rgba(255,230,107,0.58)";
+    if (!lite) {
+      ctx.shadowBlur = this.amount >= 100 ? 12 : this.amount >= 20 ? 9 : 6;
+      ctx.shadowColor = "rgba(255,230,107,0.58)";
+    }
 
     ctx.fillStyle = "#ffe66b";
     ctx.beginPath();
@@ -171,9 +185,19 @@ const TokenManager = {
   overlayDpr: 1,
 
   spawn(x, y, amount = 1, game = null) {
+    if (typeof Effects !== "undefined" && Effects.isEnabled && !Effects.isEnabled()) {
+      this.clear();
+      return;
+    }
+    if (this.tokens.length >= TOKEN_FX_LIMITS.max) return;
     const start = this.gameToOverlay(game, x, y);
     const target = this.getCollectionTarget(game, start.x, start.y);
-    this.tokens.push(new Token(start.x, start.y, amount, target.x, target.y, start.scale));
+    const quality = this.tokens.length >= TOKEN_FX_LIMITS.busy
+      ? 0.45
+      : this.tokens.length >= TOKEN_FX_LIMITS.soft
+        ? 0.65
+        : 1;
+    this.tokens.push(new Token(start.x, start.y, amount, target.x, target.y, start.scale, quality));
   },
 
   ensureOverlay(game = null) {
@@ -254,9 +278,15 @@ const TokenManager = {
   },
 
   update(game, dt) {
+    if (typeof Effects !== "undefined" && Effects.isEnabled && !Effects.isEnabled()) {
+      this.clear();
+      return;
+    }
     const screenRect = this.ensureOverlay(game);
-    for (const token of [...this.tokens]) {
-      const target = this.getCollectionTarget(game, token.targetX, token.targetY);
+    const fallback = this.tokens[0] || { targetX: 0, targetY: 0 };
+    const target = this.getCollectionTarget(game, fallback.targetX, fallback.targetY);
+    for (let i = this.tokens.length - 1; i >= 0; i -= 1) {
+      const token = this.tokens[i];
       token.setTarget(target.x, target.y);
       token.update(dt);
       const outside =
@@ -264,7 +294,7 @@ const TokenManager = {
         (token.y < -48 || token.y > screenRect.height + 56 || token.x < -48 || token.x > screenRect.width + 56);
       if (token.done || outside) {
         if (token.arrived) this.pulseMeter();
-        this.remove(token);
+        this.tokens.splice(i, 1);
       }
     }
   },
@@ -273,7 +303,9 @@ const TokenManager = {
     if (!this.overlayCanvas || !this.overlayCtx) return;
     const rect = this.overlayCanvas.getBoundingClientRect();
     this.overlayCtx.clearRect(0, 0, rect.width, rect.height);
-    for (const token of this.tokens) token.draw(this.overlayCtx);
+    if (typeof Effects !== "undefined" && Effects.isEnabled && !Effects.isEnabled()) return;
+    const lite = this.tokens.length >= TOKEN_FX_LIMITS.busy;
+    for (const token of this.tokens) token.draw(this.overlayCtx, lite || token.quality < 0.7);
   },
 
   pulseMeter() {
