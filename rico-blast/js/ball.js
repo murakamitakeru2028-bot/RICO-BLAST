@@ -65,6 +65,22 @@ class Ball {
     this.normalizeSpeed(this.getTargetSpeed());
   }
 
+  syncSkillState() {
+    const penetration = getSkillLevel(this, "penetration");
+    if (penetration > 0) this.penetrationLeft = Math.max(this.penetrationLeft || 0, penetration);
+
+    const immortality = getSkillLevel(this, "immortality");
+    if (immortality > 0) {
+      const saves = skillParam("immortality", immortality, "saves", 0);
+      this.fallSaves = Math.max(this.fallSaves || 0, saves);
+    }
+
+    if (getSkillLevel(this, "aura") > 0 && this.auraTimer <= 0) this.auraTimer = 0;
+    if (getSkillLevel(this, "echo") > 0 && this.echoTimer <= 0) this.echoTimer = 0;
+    if (getSkillLevel(this, "cycle") > 0 && this.cycleTimer <= 0) this.cycleTimer = 0;
+    this.normalizeSpeed(this.getTargetSpeed());
+  }
+
   respawn(game) {
     this.readyOnPaddle(game);
     if (getSkillLevel(this, "phantom") >= skillParam("phantom", getSkillLevel(this, "phantom"), "reviveLevel", 3)) {

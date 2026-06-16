@@ -919,6 +919,7 @@ const UI = {
           this.showToast("このボールは満杯です");
           return;
         }
+        this.rememberSkillTarget(index);
         onSelect(choice, ball, index);
       };
     });
@@ -1015,13 +1016,24 @@ const UI = {
   },
 
   prepareSkillTarget(balls) {
-    if (this.selectedSkillTarget && balls[this.selectedSkillTarget.index]) return;
-    if (this.selectedUpgradeTarget && this.selectedUpgradeTarget.type === "ball" && balls[this.selectedUpgradeTarget.index]) {
+    const canUseAsSkillTarget = (ball) => {
+      if (!ball) return false;
+      return Object.keys(SKILLS).some((id) => SKILLS[id].type === "ball" && canEquipSkill(ball, id));
+    };
+
+    if (this.selectedSkillTarget && canUseAsSkillTarget(balls[this.selectedSkillTarget.index])) return;
+    if (
+      this.selectedUpgradeTarget &&
+      this.selectedUpgradeTarget.type === "ball" &&
+      canUseAsSkillTarget(balls[this.selectedUpgradeTarget.index])
+    ) {
       this.selectedSkillTarget = { type: "ball", index: this.selectedUpgradeTarget.index };
       return;
     }
+    const firstAvailableIndex = balls.findIndex(canUseAsSkillTarget);
     const firstBallIndex = balls.findIndex(Boolean);
-    this.selectedSkillTarget = firstBallIndex >= 0 ? { type: "ball", index: firstBallIndex } : null;
+    const nextIndex = firstAvailableIndex >= 0 ? firstAvailableIndex : firstBallIndex;
+    this.selectedSkillTarget = nextIndex >= 0 ? { type: "ball", index: nextIndex } : null;
   },
 
   getSelectedSkillBall(balls) {
@@ -1045,6 +1057,13 @@ const UI = {
     }
     this.renderSlots(Game.balls, Game.paddle);
     this.renderSkillTargetSelector(Game.balls);
+  },
+
+  rememberSkillTarget(index) {
+    if (!Number.isInteger(index) || !Game.balls[index]) return;
+    this.selectedSkillTarget = { type: "ball", index };
+    this.selectedUpgradeTarget = { type: "ball", index };
+    this.invalidateSlotRender();
   },
 
   normalizeUpgradeTarget(balls) {

@@ -2268,18 +2268,26 @@ const Game = {
   },
 
   handleSkillChoice(choice, target) {
+    let appliedTarget = target;
+    let appliedBallIndex = target ? this.balls.indexOf(target) : -1;
     if (choice.type === "addBall") {
+      const newBallIndex = this.balls.length;
       if (!this.addBall()) {
         UI.showToast("ボール枠がいっぱいです");
         return;
       }
+      appliedTarget = this.balls[newBallIndex] || null;
+      appliedBallIndex = appliedTarget ? newBallIndex : -1;
     } else if (!addOrLevelSkill(target, choice.id)) {
       UI.showToast("このスキルはこれ以上装備できません");
       return;
     }
-    if (target && target.isBumper && target.syncStats) target.syncStats();
+    if (appliedTarget && appliedTarget.syncSkillState) appliedTarget.syncSkillState(this);
+    if (appliedTarget && appliedTarget.isBumper && appliedTarget.syncStats) appliedTarget.syncStats();
+    if (appliedBallIndex >= 0 && UI.rememberSkillTarget) UI.rememberSkillTarget(appliedBallIndex);
     this.rewardPending = false;
     this.updateHud();
+    UI.invalidateSlotRender();
     UI.renderSlots(this.balls, this.paddle);
     setState(STATE.UPGRADE);
     this.showUpgradeScreen();
