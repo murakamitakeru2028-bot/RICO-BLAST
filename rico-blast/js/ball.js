@@ -686,18 +686,25 @@ class Ball {
 
   draw(ctx) {
     if (!this.alive && !this.waitingLaunch) return;
+    const minimal = typeof Game !== "undefined" && Game.isMinimalModeEnabled && Game.isMinimalModeEnabled();
     const mirror = getSkillLevel(this, "mirror");
     if (!this.waitingLaunch && mirror > 0 && this.path.length > 2) this.drawMirror(ctx, mirror);
 
     ctx.save();
     if (this.skills.length === 0) {
       ctx.fillStyle = "#ffffff";
-      ctx.shadowBlur = 5;
-      ctx.shadowColor = "rgba(255,255,255,0.6)";
+      if (!minimal) {
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = "rgba(255,255,255,0.6)";
+      }
     } else if (this.skills.length === 1) {
       ctx.fillStyle = this.skills[0].color;
-      ctx.shadowBlur = 6;
-      ctx.shadowColor = `${this.skills[0].color}66`;
+      if (!minimal) {
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = `${this.skills[0].color}66`;
+      }
+    } else if (minimal) {
+      ctx.fillStyle = this.skills[0].color;
     } else {
       const gradient = ctx.createLinearGradient(
         this.x - this.radius * 0.95,
@@ -710,8 +717,10 @@ class Ball {
         gradient.addColorStop(index / Math.max(1, colors.length - 1), color);
       });
       ctx.fillStyle = gradient;
-      ctx.shadowBlur = 6;
-      ctx.shadowColor = `${colors[0]}66`;
+      if (!minimal) {
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = `${colors[0]}66`;
+      }
     }
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);

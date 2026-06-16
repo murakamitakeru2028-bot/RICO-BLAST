@@ -1,3 +1,6 @@
+const PERFORMANCE_STORAGE_KEY = "ricoBlast_powerSave";
+const MINIMAL_STORAGE_KEY = "ricoBlast_minimalMode";
+
 const Game = {
   canvas: null,
   ctx: null,
@@ -51,6 +54,11 @@ const Game = {
     mode: "direct",
     sensitivity: 1
   },
+  performanceSettingsLoaded: false,
+  performanceSettings: {
+    powerSave: false,
+    minimal: false
+  },
   resumeCountdown: 0,
   resumeCountdownDuration: 3,
   resumeCountdownLastValue: 0,
@@ -87,7 +95,7 @@ const Game = {
     const nodes = this.hudNodes || {};
     const tokenGainNode = nodes.tokenGain;
     if (tokenGainNode) {
-      tokenGainNode.textContent = "+0 TOKEN";
+      tokenGainNode.textContent = "+0 トークン";
       tokenGainNode.classList.remove("active");
     }
     const scoreGainNode = nodes.scoreGain;
@@ -116,6 +124,7 @@ const Game = {
     this.paddle.setMaxHp(this.getPaddleMaxHp());
     this.bumper = new Bumper();
     this.loadInputSettings();
+    this.loadPerformanceSettings();
     this.setupCanvas();
     this.setupInput();
     this.setupHudControls();
@@ -149,7 +158,7 @@ const Game = {
 
   setupCanvas() {
     if (!this.canvas) return;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 3);
+    this.dpr = Math.min(window.devicePixelRatio || 1, this.getDprCap());
     this.width = this.baseWidth;
     this.canvas.style.width = "100%";
     this.canvas.style.height = "100%";
@@ -306,6 +315,66 @@ const Game = {
       // Settings still apply for the current session when storage is blocked.
     }
     return this.inputSettings;
+  },
+
+  loadPerformanceSettings() {
+    this.performanceSettings = { powerSave: true, minimal: true };
+    this.performanceSettingsLoaded = true;
+    return this.performanceSettings;
+  },
+
+  getPerformanceSettings() {
+    return this.loadPerformanceSettings();
+  },
+
+  setPerformanceSettings() {
+    const current = this.getPerformanceSettings();
+    const powerSave = true;
+    const minimal = true;
+    const changed = powerSave !== current.powerSave || minimal !== current.minimal;
+    this.performanceSettings = { powerSave, minimal };
+    this.performanceSettingsLoaded = true;
+    try {
+      localStorage.setItem(PERFORMANCE_STORAGE_KEY, "1");
+      localStorage.setItem(MINIMAL_STORAGE_KEY, "1");
+    } catch (error) {
+      // Performance settings still apply for the current session when storage is blocked.
+    }
+    if (changed) {
+      this.lastTime = 0;
+      this.slotUiTimer = 0;
+      if (typeof Effects !== "undefined" && Effects.trimEffects) Effects.trimEffects();
+      if (typeof TokenManager !== "undefined" && TokenManager.trimTokens) TokenManager.trimTokens();
+      if (this.canvas && this.ctx) {
+        this.setupCanvas();
+        this.render();
+      }
+    }
+    return this.performanceSettings;
+  },
+
+  isPowerSaveEnabled() {
+    return true;
+  },
+
+  isMinimalModeEnabled() {
+    return true;
+  },
+
+  isReducedVisualsEnabled() {
+    return true;
+  },
+
+  getDprCap() {
+    return 1;
+  },
+
+  getFrameInterval() {
+    return 1000 / 30;
+  },
+
+  getSlotUiInterval() {
+    return 0.33;
   },
 
   setupHudControls() {
@@ -921,7 +990,7 @@ const Game = {
   refreshSlotUi(dt = 0, force = false) {
     this.slotUiTimer -= Math.max(0, dt || 0);
     if (!force && this.slotUiTimer > 0) return;
-    this.slotUiTimer = this.slotUiInterval;
+    this.slotUiTimer = this.getSlotUiInterval();
     UI.renderSlots(this.balls, this.paddle);
   },
 
@@ -1131,6 +1200,10 @@ const Game = {
     ctx.save();
     ctx.fillStyle = "#080812";
     ctx.fillRect(0, 0, this.width, this.height);
+    if (this.isMinimalModeEnabled()) {
+      ctx.restore();
+      return;
+    }
     ctx.strokeStyle = "rgba(255,255,255,0.028)";
     ctx.lineWidth = 1;
     for (let y = 64; y < this.height; y += 64) {
@@ -1191,7 +1264,7 @@ const Game = {
     ctx.textBaseline = "middle";
     ctx.font = "700 7px 'Space Mono', monospace";
     ctx.fillStyle = "rgba(246,251,255,0.58)";
-    ctx.fillText("COMBO", w / 2, 7);
+    ctx.fillText("コンボ", w / 2, 7);
     ctx.font = `800 ${combo >= 10 ? 17 : 16}px 'Space Mono', monospace`;
     ctx.fillStyle = combo >= 10 ? "#ffe66b" : "#7cf5b2";
     ctx.shadowBlur = 10;
@@ -1297,8 +1370,10 @@ const Game = {
       : 0;
     const tokenAmount = block.getTokenDropAmount(sourceBall, lastHitBonus);
     this.addTokens(tokenAmount);
-    TokenManager.spawn(block.cx, block.cy, tokenAmount, this);
-    Effects.spawnTokenCollect(block.cx, block.cy, Math.min(5, Math.max(1, Math.ceil(tokenAmount / 10))));
+    if (!this.isMinimalModeEnabled()) {
+      TokenManager.spawn(block.cx, block.cy, tokenAmount, this);
+      Effects.spawnTokenCollect(block.cx, block.cy, Math.min(5, Math.max(1, Math.ceil(tokenAmount / 10))));
+    }
 
     const vampire = sourceBall ? getSkillLevel(sourceBall, "vampire") : 0;
     if (vampire > 0) {
@@ -1409,7 +1484,7 @@ const Game = {
     }
 
     if (block.effect === "tokens") {
-      Effects.spawnTokenCollect(block.cx, block.cy, 3);
+      if (!this.isMinimalModeEnabled()) Effects.spawnTokenCollect(block.cx, block.cy, 3);
       return;
     }
 
@@ -2011,14 +2086,16 @@ const Game = {
     const hud = this.hudNodes?.score || document.getElementById("hud-score");
     if (hud) {
       hud.textContent = formatNumber(this.score);
-      hud.classList.remove("token-bump");
-      void hud.offsetWidth;
-      hud.classList.add("token-bump");
-      const stat = hud.closest(".score-stat");
-      if (stat) {
-        stat.classList.remove("score-pop");
-        void stat.offsetWidth;
-        stat.classList.add("score-pop");
+      if (!this.isMinimalModeEnabled()) {
+        hud.classList.remove("token-bump");
+        void hud.offsetWidth;
+        hud.classList.add("token-bump");
+        const stat = hud.closest(".score-stat");
+        if (stat) {
+          stat.classList.remove("score-pop");
+          void stat.offsetWidth;
+          stat.classList.add("score-pop");
+        }
       }
     }
   },
@@ -2038,6 +2115,7 @@ const Game = {
   },
 
   showScoreGain(amount, multiplier = 1) {
+    if (this.isMinimalModeEnabled()) return;
     this.scoreGainAmount += Math.max(0, Math.floor(amount));
     this.scoreGainBoosted = this.scoreGainBoosted || (multiplier || 1) > 1.001;
     const node = this.getScoreGainNode();
@@ -2061,21 +2139,24 @@ const Game = {
     this.tokens += gained;
     const hpToken = this.hudNodes?.hpToken || document.getElementById("hp-token-count");
     if (hpToken) hpToken.textContent = formatNumber(this.tokens);
-    const hpTokenDisplay = this.hudNodes?.hpTokenDisplay || document.getElementById("hp-token-display");
-    if (hpTokenDisplay) {
-      hpTokenDisplay.classList.remove("pulse");
-      void hpTokenDisplay.offsetWidth;
-      hpTokenDisplay.classList.add("pulse");
+    if (!this.isMinimalModeEnabled()) {
+      const hpTokenDisplay = this.hudNodes?.hpTokenDisplay || document.getElementById("hp-token-display");
+      if (hpTokenDisplay) {
+        hpTokenDisplay.classList.remove("pulse");
+        void hpTokenDisplay.offsetWidth;
+        hpTokenDisplay.classList.add("pulse");
+      }
+      this.showTokenGain(gained);
     }
-    this.showTokenGain(gained);
   },
 
   showTokenGain(amount) {
+    if (this.isMinimalModeEnabled()) return;
     if (amount <= 0) return;
     this.tokenGainAmount += amount;
     const node = this.hudNodes?.tokenGain || document.getElementById("token-gain-text");
     if (!node) return;
-    node.textContent = `+${formatNumber(this.tokenGainAmount)} TOKEN`;
+    node.textContent = `+${formatNumber(this.tokenGainAmount)} トークン`;
     node.classList.remove("active");
     void node.offsetWidth;
     node.classList.add("active");
@@ -2105,7 +2186,7 @@ const Game = {
   carveBall(index) {
     const ball = this.balls[index];
     if (!ball || !ball.carveSkills()) return false;
-    UI.showToast(`BALL ${index + 1} に刻印しました`);
+    UI.showToast(`ボール${index + 1}に刻印しました`);
     UI.renderSlots(this.balls, this.paddle);
     return true;
   },
@@ -2127,11 +2208,11 @@ const Game = {
     const nextBallNumber = this.balls.length + 1;
     const cost = getBallPurchaseCost(nextBallNumber);
     if (!Number.isFinite(cost) || this.balls.length >= BALL_MAX) {
-      UI.showToast("BALL SLOTS FULL");
+      UI.showToast("ボール枠がいっぱいです");
       return false;
     }
     if (this.tokens < cost) {
-      UI.showToast(`NEED ${formatNumber(cost)} TOKENS`);
+      UI.showToast(`トークンが${formatNumber(cost)}必要です`);
       return false;
     }
     this.tokens -= cost;
@@ -2152,12 +2233,12 @@ const Game = {
   buyBumperLevelWithTokens() {
     if (!this.bumper) this.bumper = new Bumper();
     if (this.bumper.unlocked) {
-      UI.showToast("BUMPER ALREADY UNLOCKED");
+      UI.showToast("バンパーは解放済みです");
       return false;
     }
     const cost = BUMPER_UNLOCK_COST;
     if (this.tokens < cost) {
-      UI.showToast(`NEED ${formatNumber(cost)} TOKENS`);
+      UI.showToast(`トークンが${formatNumber(cost)}必要です`);
       return false;
     }
     this.tokens -= cost;
@@ -2189,7 +2270,7 @@ const Game = {
   handleSkillChoice(choice, target) {
     if (choice.type === "addBall") {
       if (!this.addBall()) {
-        UI.showToast("BALL SLOTS FULL");
+        UI.showToast("ボール枠がいっぱいです");
         return;
       }
     } else if (!addOrLevelSkill(target, choice.id)) {
@@ -2209,23 +2290,23 @@ const Game = {
       if (!entity || !Array.isArray(entity.skills)) return [];
       return entity.skills.map((skill) => ({
         id: skill.id || "",
-        name: skill.name || skill.id || "SKILL",
+        name: skill.name || skill.id || "スキル",
         level: Number(skill.level || 1)
       }));
     };
     return {
       balls: this.balls.map((ball, index) => ({
-        label: `BALL ${index + 1}`,
+        label: `ボール${index + 1}`,
         color: ball.color || "#ffffff",
         skills: readSkills(ball)
       })),
       paddle: {
-        label: "PADDLE",
+        label: "パドル",
         skills: readSkills(this.paddle)
       },
       bumper: this.bumper && this.bumper.unlocked
         ? {
-          label: "BUMPER",
+          label: "バンパー",
           skills: readSkills(this.bumper)
         }
         : null
@@ -2273,7 +2354,7 @@ const Game = {
       const percent = clamp((current / goal) * 100, 0, 100);
       const fill = `${percent}%`;
       const ready = current >= goal || this.rewardPending;
-      const label = `SKILL ${current} / ${goal}`;
+      const label = `スキル ${current} / ${goal}`;
       if (state.skillFill !== fill) {
         skillProgress.style.setProperty("--skill-progress-fill", fill);
         state.skillFill = fill;
@@ -2298,10 +2379,12 @@ const Game = {
     const pauseButton = nodes.pauseButton || document.getElementById("btn-pause");
     if (pauseButton) {
       const resuming = this.isResuming();
-      const pauseText = resuming ? "READY" : (this.paused ? "PAUSED" : "STOP");
+      const pauseText = resuming ? "準備中" : (this.paused ? "停止中" : "停止");
       const pauseDisabled = this.paused || resuming;
       if (state.pauseText !== pauseText) {
-        pauseButton.textContent = pauseText;
+        pauseButton.textContent = "";
+        pauseButton.setAttribute("aria-label", pauseText);
+        pauseButton.title = pauseText;
         state.pauseText = pauseText;
       }
       if (state.pauseDisabled !== pauseDisabled) {
@@ -2339,9 +2422,11 @@ const Game = {
     if (combo !== this.comboHudValue) {
       this.comboHudValue = combo;
       countNode.textContent = String(combo);
-      banner.classList.remove("combo-pop");
-      void banner.offsetWidth;
-      banner.classList.add("combo-pop");
+      if (!this.isMinimalModeEnabled()) {
+        banner.classList.remove("combo-pop");
+        void banner.offsetWidth;
+        banner.classList.add("combo-pop");
+      }
     }
   }
 };

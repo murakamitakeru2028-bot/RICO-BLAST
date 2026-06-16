@@ -10,6 +10,7 @@ const STATE = {
 let currentState = STATE.TITLE;
 let animationId = null;
 let resizeFrame = null;
+let lastLoopFrameAt = 0;
 
 function shouldRunGameLoop() {
   return currentState !== STATE.TITLE && currentState !== STATE.GAME_OVER;
@@ -32,12 +33,35 @@ function setState(newState) {
   currentState = newState;
   UI.updateScreens(newState);
   if (Game) Game.lastTime = 0;
+  lastLoopFrameAt = 0;
   if (shouldRunGameLoop()) startGameLoop();
   else stopGameLoop();
 }
 
+function shouldProcessFrame(timestamp) {
+  const frameInterval = Game && Game.getFrameInterval ? Game.getFrameInterval() : 0;
+  if (frameInterval <= 0) {
+    lastLoopFrameAt = timestamp;
+    return true;
+  }
+  if (!lastLoopFrameAt) {
+    lastLoopFrameAt = timestamp;
+    return true;
+  }
+  const elapsed = timestamp - lastLoopFrameAt;
+  if (elapsed < frameInterval) return false;
+  lastLoopFrameAt = elapsed > frameInterval * 4
+    ? timestamp
+    : lastLoopFrameAt + frameInterval;
+  return true;
+}
+
 function gameLoop(timestamp) {
   animationId = null;
+  if (!shouldProcessFrame(timestamp)) {
+    if (shouldRunGameLoop()) startGameLoop();
+    return;
+  }
   if (currentState === STATE.PLAYING) {
     Game.update(timestamp);
     Game.render();

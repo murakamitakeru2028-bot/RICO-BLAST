@@ -71,6 +71,16 @@ const Effects = {
     return this.getLoadScore() >= EFFECT_LIMITS.totalOverload;
   },
 
+  isPowerSaveMode() {
+    if (typeof Game === "undefined") return false;
+    if (Game.isReducedVisualsEnabled) return Game.isReducedVisualsEnabled();
+    return Game.isPowerSaveEnabled && Game.isPowerSaveEnabled();
+  },
+
+  isMinimalMode() {
+    return typeof Game !== "undefined" && Game.isMinimalModeEnabled && Game.isMinimalModeEnabled();
+  },
+
   hasVisualEffects() {
     return this.particles.length > 0 ||
       this.rings.length > 0 ||
@@ -82,16 +92,27 @@ const Effects = {
 
   getEffectScale(important = false) {
     const load = this.getLoadScore();
-    if (load >= EFFECT_LIMITS.totalOverload) return important ? 0.5 : 0.24;
-    if (load >= EFFECT_LIMITS.totalBusy) return important ? 0.66 : 0.38;
-    if (load >= EFFECT_LIMITS.totalSoft) return important ? 0.82 : 0.58;
-    if (this.particles.length >= EFFECT_LIMITS.particlesSoft) return important ? 0.86 : 0.68;
-    return 1;
+    let scale = 1;
+    if (load >= EFFECT_LIMITS.totalOverload) scale = important ? 0.5 : 0.24;
+    else if (load >= EFFECT_LIMITS.totalBusy) scale = important ? 0.66 : 0.38;
+    else if (load >= EFFECT_LIMITS.totalSoft) scale = important ? 0.82 : 0.58;
+    else if (this.particles.length >= EFFECT_LIMITS.particlesSoft) scale = important ? 0.86 : 0.68;
+    if (this.isMinimalMode()) return Math.min(scale, important ? 0.28 : 0.08);
+    return this.isPowerSaveMode() ? Math.min(scale, important ? 0.72 : 0.42) : scale;
   },
 
   shouldSkipMinor(important = false) {
     if (important) return false;
     const load = this.getLoadScore();
+    if (this.isMinimalMode()) {
+      if (load >= EFFECT_LIMITS.totalSoft) return Math.random() < 0.94;
+      return Math.random() < 0.82;
+    }
+    if (this.isPowerSaveMode()) {
+      if (load >= EFFECT_LIMITS.totalBusy) return Math.random() < 0.75;
+      if (load >= EFFECT_LIMITS.totalSoft) return Math.random() < 0.62;
+      return Math.random() < 0.35;
+    }
     if (load >= EFFECT_LIMITS.totalOverload) return Math.random() < 0.75;
     if (load >= EFFECT_LIMITS.totalBusy) return Math.random() < 0.45;
     if (this.particles.length >= EFFECT_LIMITS.particles) return Math.random() < 0.6;
@@ -99,7 +120,8 @@ const Effects = {
   },
 
   scaledCount(base, important = false, min = 0) {
-    return Math.max(min, Math.round(base * this.getEffectScale(important)));
+    const minimum = this.isMinimalMode() ? Math.min(min, important ? 2 : 0) : min;
+    return Math.max(minimum, Math.round(base * this.getEffectScale(important)));
   },
 
   spawnBlockBreak(x, y, color, options = {}) {
@@ -386,7 +408,7 @@ const Effects = {
   },
 
   spawnTokenCollect(x, y, amount = 1) {
-    this.showTokenCollect(x, y, amount);
+    return;
   },
 
   showTokenCollect(x, y, amount = 1) {
@@ -444,7 +466,8 @@ const Effects = {
   shakeScreen(amplitude, duration) {
     if (!this.isEnabled()) return;
     if (this.isOverloaded() && amplitude < 1.5) return;
-    const scale = this.isBusy() ? 0.65 : 1;
+    if (this.isMinimalMode() && amplitude < 2) return;
+    const scale = this.isMinimalMode() ? 0.35 : (this.isBusy() ? 0.65 : 1);
     this.shakeAmount = Math.max(this.shakeAmount, amplitude * scale);
     this.shakeDuration = Math.max(this.shakeDuration, duration * scale);
     this.shakeElapsed = 0;
@@ -459,6 +482,9 @@ const Effects = {
     const value = Math.max(1, Math.round(amount));
     const heavy = value >= 25 || source === "ball";
     const important = source === "paddle" || value >= 1000;
+    if (this.isMinimalMode() && !important) {
+      return;
+    }
     if (!important && this.damageNumbers.length >= EFFECT_LIMITS.damageSoft) {
       const keepChance = source === "ball" ? 0.45 : 0.25;
       if (Math.random() > keepChance) return;
@@ -486,6 +512,8 @@ const Effects = {
     const value = Math.max(1, Math.round(amount));
     const label = typeof formatNumber === "function" ? formatNumber(value) : String(value);
     const bonus = Math.max(1, multiplier || 1);
+    if (this.isMinimalMode() && bonus <= 1.001) return;
+    if (this.isMinimalMode() && this.damageNumbers.length >= 6) return;
     if (bonus <= 1.001 && this.damageNumbers.length >= EFFECT_LIMITS.damageNumbers) return;
     this.damageNumbers.push({
       text: `+${label}`,
@@ -499,7 +527,7 @@ const Effects = {
       maxLife: bonus > 1.001 ? 0.76 : 0.62,
       pop: bonus > 1.001 ? 1.42 : 1.28
     });
-    if (bonus > 1.001 && !this.isOverloaded()) {
+    if (bonus > 1.001 && !this.isOverloaded() && !this.isMinimalMode()) {
       this.damageNumbers.push({
         text: `x${bonus.toFixed(2)}`,
         x: x + rand(-4, 4),
@@ -683,13 +711,20 @@ const Effects = {
   },
 
   trimEffects() {
-    if (this.particles.length > EFFECT_LIMITS.particles) this.particles.splice(0, this.particles.length - EFFECT_LIMITS.particles);
-    if (this.rings.length > EFFECT_LIMITS.rings) this.rings.splice(0, this.rings.length - EFFECT_LIMITS.rings);
-    if (this.bursts.length > EFFECT_LIMITS.bursts) this.bursts.splice(0, this.bursts.length - EFFECT_LIMITS.bursts);
-    if (this.damageNumbers.length > EFFECT_LIMITS.damageNumbers) {
-      this.damageNumbers.splice(0, this.damageNumbers.length - EFFECT_LIMITS.damageNumbers);
+    const minimal = this.isMinimalMode();
+    const powerSave = this.isPowerSaveMode();
+    const limits = minimal
+      ? { particles: 12, rings: 3, bursts: 1, damageNumbers: 2, popups: 0 }
+      : powerSave
+      ? { particles: 80, rings: 14, bursts: 6, damageNumbers: 18, popups: 2 }
+      : EFFECT_LIMITS;
+    if (this.particles.length > limits.particles) this.particles.splice(0, this.particles.length - limits.particles);
+    if (this.rings.length > limits.rings) this.rings.splice(0, this.rings.length - limits.rings);
+    if (this.bursts.length > limits.bursts) this.bursts.splice(0, this.bursts.length - limits.bursts);
+    if (this.damageNumbers.length > limits.damageNumbers) {
+      this.damageNumbers.splice(0, this.damageNumbers.length - limits.damageNumbers);
     }
-    if (this.popups.length > EFFECT_LIMITS.popups) this.popups.splice(0, this.popups.length - EFFECT_LIMITS.popups);
+    if (this.popups.length > limits.popups) this.popups.splice(0, this.popups.length - limits.popups);
   },
 
   update(dt) {
@@ -786,16 +821,19 @@ const Effects = {
   draw(ctx) {
     if (!this.isEnabled()) return;
     if (!this.hasVisualEffects()) return;
+    const minimal = this.isMinimalMode();
+    const powerSave = minimal || this.isPowerSaveMode();
     const load = this.getLoadScore();
-    const busy = load >= EFFECT_LIMITS.totalBusy;
-    const overloaded = load >= EFFECT_LIMITS.totalOverload;
+    const busy = powerSave || load >= EFFECT_LIMITS.totalBusy;
+    const overloaded = minimal || load >= (powerSave ? EFFECT_LIMITS.totalSoft : EFFECT_LIMITS.totalOverload);
     for (const burst of this.bursts) {
+      if (minimal && burst.opacity < 0.9) continue;
       const progress = 1 - burst.life / burst.maxLife;
       const alpha = clamp(burst.life / burst.maxLife, 0, 1);
       const radius = Math.max(2, burst.radius || burst.maxRadius * progress);
       ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = Math.min(1, alpha * (burst.opacity || 0.72) * (1.2 - progress * 0.35));
+      if (!powerSave) ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = Math.min(1, alpha * (burst.opacity || 0.72) * (minimal ? 0.58 : 1.2 - progress * 0.35));
       if (busy) {
         ctx.fillStyle = burst.color;
       } else {
@@ -812,7 +850,7 @@ const Effects = {
     }
 
     for (let i = 0; i < this.particles.length; i += 1) {
-      if (overloaded && i % 2 === 1) continue;
+      if (overloaded && i % (minimal ? 4 : powerSave ? 3 : 2) !== 0) continue;
       const particle = this.particles[i];
       const alpha = clamp(particle.life / particle.maxLife, 0, 1);
       ctx.save();
@@ -848,7 +886,10 @@ const Effects = {
       ctx.restore();
     }
 
-    for (const ring of this.rings) {
+    for (let i = 0; i < this.rings.length; i += 1) {
+      if (minimal && i % 3 !== 0) continue;
+      if (!minimal && powerSave && i % 2 === 1) continue;
+      const ring = this.rings[i];
       const alpha = clamp(ring.life / ring.maxLife, 0, 1);
       ctx.save();
       ctx.globalAlpha = alpha;

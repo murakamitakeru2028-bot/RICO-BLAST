@@ -354,7 +354,7 @@ const SKILLS = {
     category: "recovery",
     color: "#7cf5b2",
     maxLevel: 5,
-    description: "ブロック破壊時にパドルHPを吸収回復"
+    description: "ブロック破壊時にHPを吸収回復"
   },
   paddleWidth: {
     id: "paddleWidth",

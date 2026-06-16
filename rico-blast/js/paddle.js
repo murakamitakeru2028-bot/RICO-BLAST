@@ -69,19 +69,26 @@ class Paddle {
   }
 
   draw(ctx) {
+    const minimal = typeof Game !== "undefined" && Game.isMinimalModeEnabled && Game.isMinimalModeEnabled();
     const width = this.getWidth();
     const scaleY = this.bounceTimer > 0 ? 0.7 + (1 - this.bounceTimer / 0.1) * 0.3 : 1;
     ctx.save();
     ctx.translate(this.x + width / 2, this.y + this.height / 2);
     ctx.scale(1, scaleY);
     roundedRect(ctx, -width / 2, -this.height / 2, width, this.height, 6);
-    const body = ctx.createLinearGradient(-width / 2, -this.height / 2, width / 2, this.height / 2);
-    body.addColorStop(0, "#ffffff");
-    body.addColorStop(0.5, "#f6fbff");
-    body.addColorStop(1, "#dbe7f0");
-    ctx.fillStyle = body;
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = "rgba(246,251,255,0.42)";
+    if (minimal) {
+      ctx.fillStyle = "#f6fbff";
+    } else {
+      const body = ctx.createLinearGradient(-width / 2, -this.height / 2, width / 2, this.height / 2);
+      body.addColorStop(0, "#ffffff");
+      body.addColorStop(0.5, "#f6fbff");
+      body.addColorStop(1, "#dbe7f0");
+      ctx.fillStyle = body;
+    }
+    if (!minimal) {
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "rgba(246,251,255,0.42)";
+    }
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 0.5;
@@ -102,8 +109,10 @@ class Paddle {
     if (this.healFlashTimer > 0) {
       ctx.globalAlpha = clamp(this.healFlashTimer / 0.2, 0, 1);
       ctx.fillStyle = "#4aff88";
-      ctx.shadowBlur = 18;
-      ctx.shadowColor = "rgba(74, 255, 136, 0.82)";
+      if (!minimal) {
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = "rgba(74, 255, 136, 0.82)";
+      }
       roundedRect(ctx, -width / 2 - 2, -this.height / 2 - 3, width + 4, this.height + 6, 6);
       ctx.fill();
     }

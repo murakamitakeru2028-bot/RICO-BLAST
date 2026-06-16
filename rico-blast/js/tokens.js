@@ -8,7 +8,7 @@ class Token {
   constructor(x, y, amount = 1, targetX = 0, targetY = 0, scale = 1, quality = 1) {
     this.amount = Math.max(1, Math.floor(amount));
     this.scale = clamp(scale, 0.82, 1.4);
-    this.quality = clamp(quality, 0.45, 1);
+    this.quality = clamp(quality, 0.35, 1);
     this.x = x + rand(-3, 3) * this.scale;
     this.y = y + rand(-2, 2) * this.scale;
     this.originX = this.x;
@@ -26,10 +26,10 @@ class Token {
     this.rotation = rand(0, Math.PI * 2);
     this.spin = rand(0.08, 0.16) * (Math.random() < 0.5 ? -1 : 1);
     this.orbit = rand(-1, 1);
-    this.trail = [{ x: this.x, y: this.y, life: 1 }];
+    this.trail = this.quality <= 0.5 ? [] : [{ x: this.x, y: this.y, life: 1 }];
     this.trailTimer = 0;
     this.trailInterval = this.quality < 0.7 ? 0.038 : 0.018;
-    this.trailLimit = this.quality < 0.7 ? 7 : 15;
+    this.trailLimit = this.quality <= 0.5 ? 0 : (this.quality < 0.7 ? 5 : 12);
   }
 
   setTarget(x, y) {
@@ -81,16 +81,20 @@ class Token {
     }
 
     this.rotation += this.spin * (1 + travel * 1.4) * frame;
-    this.trailTimer -= dt;
-    if (this.trailTimer <= 0) {
-      this.trailTimer = this.trailInterval;
-      this.trail.push({ x: this.x, y: this.y, life: 1 });
-      if (this.trail.length > this.trailLimit) this.trail.shift();
-    }
-    for (let i = this.trail.length - 1; i >= 0; i -= 1) {
-      const point = this.trail[i];
-      point.life -= dt * 2.4;
-      if (point.life <= 0) this.trail.splice(i, 1);
+    if (this.trailLimit > 0) {
+      this.trailTimer -= dt;
+      if (this.trailTimer <= 0) {
+        this.trailTimer = this.trailInterval;
+        this.trail.push({ x: this.x, y: this.y, life: 1 });
+        if (this.trail.length > this.trailLimit) this.trail.shift();
+      }
+      for (let i = this.trail.length - 1; i >= 0; i -= 1) {
+        const point = this.trail[i];
+        point.life -= dt * 2.4;
+        if (point.life <= 0) this.trail.splice(i, 1);
+      }
+    } else if (this.trail.length) {
+      this.trail.length = 0;
     }
 
     const arriveRadius = Math.max(8, 9 * this.scale);
@@ -184,22 +188,29 @@ const TokenManager = {
   overlayRect: null,
   overlayDpr: 1,
 
+  isPowerSaveMode() {
+    if (typeof Game === "undefined") return false;
+    if (Game.isReducedVisualsEnabled) return Game.isReducedVisualsEnabled();
+    return Game.isPowerSaveEnabled && Game.isPowerSaveEnabled();
+  },
+
+  isMinimalMode() {
+    return typeof Game !== "undefined" && Game.isMinimalModeEnabled && Game.isMinimalModeEnabled();
+  },
+
+  getLimits() {
+    if (this.isMinimalMode()) return { soft: 4, busy: 6, max: 8 };
+    return this.isPowerSaveMode()
+      ? { soft: 10, busy: 16, max: 22 }
+      : TOKEN_FX_LIMITS;
+  },
+
   spawn(x, y, amount = 1, game = null) {
-    if (typeof Effects !== "undefined" && Effects.isEnabled && !Effects.isEnabled()) {
+    if (this.tokens.length > 0) {
       this.clear();
-      return;
+    } else if (this.overlayCanvas && this.overlayCanvas.style.display !== "none") {
+      this.hideOverlay();
     }
-    if (this.tokens.length >= TOKEN_FX_LIMITS.max) return;
-    const screenRect = this.ensureOverlay(game);
-    const start = this.gameToOverlay(game, x, y, screenRect);
-    const target = this.getCollectionTarget(game, start.x, start.y, screenRect);
-    const quality = this.tokens.length >= TOKEN_FX_LIMITS.busy
-      ? 0.45
-      : this.tokens.length >= TOKEN_FX_LIMITS.soft
-        ? 0.65
-        : 1;
-    this.tokens.push(new Token(start.x, start.y, amount, target.x, target.y, start.scale, quality));
-    if (this.overlayCanvas) this.overlayCanvas.style.display = "block";
   },
 
   ensureOverlay(game = null) {
@@ -223,7 +234,7 @@ const TokenManager = {
     }
 
     const rect = root.getBoundingClientRect();
-    const dpr = clamp(window.devicePixelRatio || 1, 1, 2);
+    const dpr = clamp(window.devicePixelRatio || 1, 1, this.isMinimalMode() ? 1 : (this.isPowerSaveMode() ? 1.25 : 2));
     const width = Math.max(1, Math.round(rect.width * dpr));
     const height = Math.max(1, Math.round(rect.height * dpr));
     if (this.overlayCanvas.width !== width || this.overlayCanvas.height !== height) {
@@ -274,6 +285,18 @@ const TokenManager = {
     this.hideOverlay();
   },
 
+  trimTokens() {
+    const limits = this.getLimits();
+    if (this.tokens.length > limits.max) this.tokens.splice(0, this.tokens.length - limits.max);
+    if (this.isMinimalMode() || this.isPowerSaveMode()) {
+      for (const token of this.tokens) {
+        token.quality = Math.min(token.quality || 1, this.isMinimalMode() ? 0.35 : 0.45);
+        token.trailLimit = 0;
+        token.trail.length = 0;
+      }
+    }
+  },
+
   getOverlaySize() {
     if (!this.overlayCanvas) return { width: 0, height: 0 };
     return {
@@ -293,46 +316,14 @@ const TokenManager = {
   },
 
   update(game, dt) {
-    if (typeof Effects !== "undefined" && Effects.isEnabled && !Effects.isEnabled()) {
-      if (this.tokens.length > 0) {
-        this.clear();
-      } else {
-        this.hideOverlay();
-      }
-      return;
-    }
-    if (this.tokens.length === 0) {
-      this.hideOverlay();
-      return;
-    }
-    const screenRect = this.ensureOverlay(game);
-    const fallback = this.tokens[0] || { targetX: 0, targetY: 0 };
-    const target = this.getCollectionTarget(game, fallback.targetX, fallback.targetY, screenRect);
-    for (let i = this.tokens.length - 1; i >= 0; i -= 1) {
-      const token = this.tokens[i];
-      token.setTarget(target.x, target.y);
-      token.update(dt);
-      const outside =
-        screenRect &&
-        (token.y < -48 || token.y > screenRect.height + 56 || token.x < -48 || token.x > screenRect.width + 56);
-      if (token.done || outside) {
-        if (token.arrived) this.pulseMeter();
-        this.tokens.splice(i, 1);
-      }
-    }
-    if (this.tokens.length === 0) {
-      this.clearOverlay();
+    if (this.tokens.length > 0) {
+      this.clear();
+    } else if (this.overlayCanvas && this.overlayCanvas.style.display !== "none") {
       this.hideOverlay();
     }
   },
 
   draw() {
-    if (!this.overlayCanvas || !this.overlayCtx || this.tokens.length === 0) return;
-    const size = this.getOverlaySize();
-    this.overlayCtx.clearRect(0, 0, size.width, size.height);
-    if (typeof Effects !== "undefined" && Effects.isEnabled && !Effects.isEnabled()) return;
-    const lite = this.tokens.length >= TOKEN_FX_LIMITS.busy;
-    for (const token of this.tokens) token.draw(this.overlayCtx, lite || token.quality < 0.7);
   },
 
   pulseMeter() {

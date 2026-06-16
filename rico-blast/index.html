@@ -25,33 +25,33 @@
   <div id="screen-game" class="screen">
     <div id="hud-bar">
       <div id="hud-score-block">
-        <span class="hud-label">SCORE</span>
+        <span class="hud-label">スコア</span>
         <b id="hud-score">0</b>
       </div>
       <div id="hud-run-block">
-        <span class="hud-label">TIME</span>
+        <span class="hud-label">時間</span>
         <b id="hud-timer">0:00</b>
-        <div id="hud-skill-progress" aria-label="SKILL 0 / 30">
+        <div id="hud-skill-progress" aria-label="スキル 0 / 30">
           <span id="hud-skill-progress-fill"></span>
         </div>
       </div>
-      <button id="btn-pause" class="hud-button" type="button">STOP</button>
+      <button id="btn-pause" class="hud-button" type="button" aria-label="停止"></button>
     </div>
     <div id="game-stage">
       <canvas id="game-canvas"></canvas>
       <div id="combo-banner" aria-live="polite">
         <b id="combo-count">0</b>
-        <span>COMBO</span>
+        <span>コンボ</span>
       </div>
       <div id="resume-countdown" aria-live="assertive" aria-hidden="true">
         <span id="resume-countdown-value">3</span>
-        <em>READY</em>
+        <em>準備</em>
       </div>
 
       <div id="screen-skill" class="game-panel">
         <div class="overlay-panel skill-panel">
-          <p class="overlay-kicker">SKILL READY</p>
-          <h2 class="overlay-title">CHOOSE A SKILL</h2>
+          <p class="overlay-kicker">スキル獲得</p>
+          <h2 class="overlay-title">スキルを選択</h2>
           <div id="skill-cards"></div>
           <div id="ball-picker"></div>
           <div id="skill-reroll-row"></div>
@@ -61,7 +61,7 @@
       <div id="screen-upgrade" class="game-panel">
         <div class="overlay-panel upgrade-panel">
           <div id="upgrade-list"></div>
-          <button id="btn-continue">CONTINUE</button>
+          <button id="btn-continue">続ける</button>
         </div>
       </div>
 
@@ -76,13 +76,13 @@
     </div>
     <div id="paddle-hp">
       <span id="hp-token-display">
-        <span>TOKEN</span>
+        <span>トークン</span>
         <b id="hp-token-count">0</b>
       </span>
-      <span id="token-gain-text">+0 TOKEN</span>
+      <span id="token-gain-text">+0 トークン</span>
       <div id="paddle-hp-meter">
         <div class="hp-meter-head">
-          <span class="hp-label">PADDLE HP</span>
+          <span class="hp-label">HP</span>
           <span id="paddle-hp-text">20 / 20</span>
         </div>
         <div id="paddle-hp-track">

@@ -157,9 +157,10 @@ class Bumper {
 
   draw(ctx) {
     if (this.maxHp <= 0) return;
+    const minimal = typeof Game !== "undefined" && Game.isMinimalModeEnabled && Game.isMinimalModeEnabled();
     const hit = clamp(this.hitFlashTimer / 0.18, 0, 1);
     const revive = clamp(this.flashTimer / 0.3, 0, 1);
-    const now = performance.now();
+    const now = (!minimal || this.broken) ? performance.now() : 0;
     const pulse = this.broken ? 0.5 + Math.sin(now / 120) * 0.5 : 0;
     const margin = 12;
     const railW = Math.max(0, this.width - margin * 2);
@@ -179,19 +180,25 @@ class Bumper {
     ctx.fill();
 
     ctx.globalAlpha = this.broken ? 0.58 : 0.95;
-    ctx.shadowBlur = this.broken ? 10 + pulse * 8 : 12 + hit * 8 + revive * 10;
-    ctx.shadowColor = this.broken ? "rgba(255,95,136,0.42)" : "rgba(103,216,255,0.34)";
-    const shell = ctx.createLinearGradient(0, railY, 0, railY + railH);
-    if (this.broken) {
-      shell.addColorStop(0, "#3a1b2a");
-      shell.addColorStop(0.52, "#211421");
-      shell.addColorStop(1, "#110c15");
-    } else {
-      shell.addColorStop(0, "#31364d");
-      shell.addColorStop(0.48, "#171b2d");
-      shell.addColorStop(1, "#090b14");
+    if (!minimal) {
+      ctx.shadowBlur = this.broken ? 10 + pulse * 8 : 12 + hit * 8 + revive * 10;
+      ctx.shadowColor = this.broken ? "rgba(255,95,136,0.42)" : "rgba(103,216,255,0.34)";
     }
-    ctx.fillStyle = shell;
+    if (minimal) {
+      ctx.fillStyle = this.broken ? "#211421" : "#171b2d";
+    } else {
+      const shell = ctx.createLinearGradient(0, railY, 0, railY + railH);
+      if (this.broken) {
+        shell.addColorStop(0, "#3a1b2a");
+        shell.addColorStop(0.52, "#211421");
+        shell.addColorStop(1, "#110c15");
+      } else {
+        shell.addColorStop(0, "#31364d");
+        shell.addColorStop(0.48, "#171b2d");
+        shell.addColorStop(1, "#090b14");
+      }
+      ctx.fillStyle = shell;
+    }
     roundedRect(ctx, margin, railY, railW, railH, 6);
     ctx.fill();
 
@@ -217,11 +224,15 @@ class Bumper {
 
     if (!this.broken) {
       const hpW = Math.max(2, coreW * hpRatio);
-      const hp = ctx.createLinearGradient(coreX, 0, coreX + coreW, 0);
-      hp.addColorStop(0, "rgba(103,216,255,0.78)");
-      hp.addColorStop(0.52, "rgba(246,251,255,0.94)");
-      hp.addColorStop(1, "rgba(124,245,178,0.82)");
-      ctx.fillStyle = hp;
+      if (minimal) {
+        ctx.fillStyle = "rgba(124,245,178,0.82)";
+      } else {
+        const hp = ctx.createLinearGradient(coreX, 0, coreX + coreW, 0);
+        hp.addColorStop(0, "rgba(103,216,255,0.78)");
+        hp.addColorStop(0.52, "rgba(246,251,255,0.94)");
+        hp.addColorStop(1, "rgba(124,245,178,0.82)");
+        ctx.fillStyle = hp;
+      }
       ctx.fillRect(coreX, coreY, hpW, coreH);
       if (hpRatio < 0.995) {
         ctx.fillStyle = "rgba(4,6,16,0.52)";
@@ -248,7 +259,7 @@ class Bumper {
       }
     }
 
-    if (!this.broken) {
+    if (!this.broken && !minimal) {
       const sweep = coreX + ((now / 14) % Math.max(1, coreW + 42)) - 21;
       ctx.globalAlpha = 0.22 + hit * 0.36 + revive * 0.32;
       const beam = ctx.createLinearGradient(sweep - 18, 0, sweep + 18, 0);

@@ -1,43 +1,43 @@
 const SLOT_SKILL_LABELS = {
-  penetration: "PIERCE",
-  immortality: "IMMORTAL",
-  sprint: "SPRINT",
-  teleporter: "WARP",
-  splash: "SPLASH",
-  spread: "SPREAD",
-  chain: "CHAIN",
-  sniper: "SNIPER",
-  doubleChance: "DOUBLE",
-  crossfire: "CROSS",
-  overload: "OVERLOAD",
-  fragment: "FRAG",
-  detonator: "DETONATE",
+  penetration: "貫通",
+  immortality: "不死",
+  sprint: "加速",
+  teleporter: "ワープ",
+  splash: "範囲",
+  spread: "拡散",
+  chain: "連鎖",
+  sniper: "狙撃",
+  doubleChance: "追撃",
+  crossfire: "左右弾",
+  overload: "過負荷",
+  fragment: "欠片",
+  detonator: "爆破",
   shatter: "粉砕",
-  poison: "POISON",
-  afterburn: "BURN",
-  lightning: "LIGHTNING",
-  impact: "IMPACT",
-  crash: "CRASH",
-  blast: "BLAST",
-  mirror: "MIRROR",
-  rebound: "REBOUND",
-  echo: "ECHO",
-  phantom: "PHANTOM",
-  aura: "AURA",
-  berserker: "BERSERK",
-  cycle: "CYCLE",
-  expert: "EXPERT",
-  lastHit: "LAST HIT",
-  scoreBoost: "SCORE",
-  vampire: "VAMPIRE",
-  paddleWidth: "WIDTH",
-  bounceHeal: "HEAL",
-  reviveBoost: "REVIVE",
-  superBounce: "BOUNCE",
-  globalDamage: "DAMAGE",
-  globalSpeed: "SPEED",
-  bumperFortify: "BUMP HP",
-  bumperRecover: "BUMP REC"
+  poison: "毒",
+  afterburn: "炎上",
+  lightning: "電撃",
+  impact: "衝撃",
+  crash: "激突",
+  blast: "爆風",
+  mirror: "鏡像",
+  rebound: "反発",
+  echo: "残響",
+  phantom: "幻影",
+  aura: "オーラ",
+  berserker: "狂戦",
+  cycle: "周期",
+  expert: "熟練",
+  lastHit: "止め",
+  scoreBoost: "スコア",
+  vampire: "吸収",
+  paddleWidth: "幅",
+  bounceHeal: "回復",
+  reviveBoost: "復活",
+  superBounce: "強打",
+  globalDamage: "攻撃",
+  globalSpeed: "速度",
+  bumperFortify: "バHP",
+  bumperRecover: "バ復帰"
 };
 
 const SKILL_DETAIL_TEXT = {
@@ -71,7 +71,7 @@ const SKILL_DETAIL_TEXT = {
   expert: "装備スキルの平均レベルが高いほどダメージ上昇。育ったボールほど伸びる晩成型。",
   lastHit: "このボールがトドメを刺すとトークン量が増える。高HPブロックの最後を取るほどおいしい。",
   scoreBoost: "このボールの破壊スコアが増える。コンボと合わせるとスコアの伸びが大きい。",
-  vampire: "このボールが破壊したブロックHPの★%をパドルHPへ吸収。最低1回復する。",
+  vampire: "このボールが破壊したブロックHPの★%をHPへ吸収。最低1回復する。",
   paddleWidth: "パドル幅を広げて受けやすくする。★ごとに横幅が増え、事故を減らせる。",
   bounceHeal: "ボールがパドルに当たるたびHPを★分回復する。満タンを超えては回復しない。",
   reviveBoost: "全ボールの復活時間を短縮する。複数ボール運用で立て直しが早くなる。",
@@ -104,11 +104,11 @@ const UI = {
     const highScore = Number(localStorage.getItem("ricoBlast_highScore") || 0);
     const bestBlocks = Number(localStorage.getItem("ricoBlast_bestBlocks") || 0);
     const account = typeof AccountManager !== "undefined" ? AccountManager.getCurrentAccount() : null;
-    const accountLabel = account ? this.escapeHtml(account.username || "ACCOUNT") : "ACCOUNT";
+    const accountLabel = account ? this.escapeHtml(account.username || "アカウント") : "アカウント";
     title.innerHTML = `
       <div class="title-shell">
         <div class="title-topline">
-          <span>RICO SYSTEM</span>
+          <span>RICOシステム</span>
           <span>v0.1.0</span>
         </div>
 
@@ -123,13 +123,13 @@ const UI = {
           <span> </span>
           <span class="logo-blast">BLAST</span>
         </h1>
-        <p class="logo-sub clean">BREAK / BUILD / ASCEND</p>
-        <p class="logo-sub">BREAK · BUILD · ASCEND</p>
+        <p class="logo-sub clean">壊す / 強化 / 上昇</p>
+        <p class="logo-sub">壊して、強くして、上へ</p>
       </div>
 
       <div class="title-preview" aria-hidden="true">
         <div class="title-preview-score">
-          <span>SCORE</span>
+          <span>スコア</span>
           <b>${formatNumber(highScore)}</b>
         </div>
         <div class="title-preview-grid">
@@ -145,17 +145,17 @@ const UI = {
       </div>
 
       <div class="title-record-row">
-        <span><b>${formatNumber(highScore)}</b><em>BEST SCORE</em></span>
-        <span><b>${formatNumber(bestBlocks)}</b><em>BEST BLOCKS</em></span>
+        <span><b>${formatNumber(highScore)}</b><em>最高スコア</em></span>
+        <span><b>${formatNumber(bestBlocks)}</b><em>最高ブロック</em></span>
       </div>
 
       <div class="title-buttons">
-        <button class="btn-start" id="btn-start">GAME START</button>
+        <button class="btn-start" id="btn-start">ゲーム開始</button>
         <div class="title-secondary-buttons">
-          <button class="btn-sub" id="btn-ranking">RANKING</button>
+          <button class="btn-sub" id="btn-ranking">ランキング</button>
           <button class="btn-sub" id="btn-account">${accountLabel}</button>
-          <button class="btn-sub" id="btn-settings">SETTINGS</button>
-          <button class="btn-sub btn-install" id="btn-install" hidden>INSTALL</button>
+          <button class="btn-sub" id="btn-settings">設定</button>
+          <button class="btn-sub btn-install" id="btn-install" hidden>インストール</button>
         </div>
       </div>
       </div>
@@ -309,13 +309,13 @@ const UI = {
         slot.style.removeProperty("--primary-skill-color");
         slot.style.removeProperty("--revive-fill");
         if (isStoreSlot) {
-          const cost = Number.isFinite(buyState.cost) ? `${formatNumber(buyState.cost)}T` : "MAX";
-          const state = buyState.buyable ? "BUY" : (buyState.insufficient ? "NEED" : (buyState.locked ? "LOCKED" : "MAX"));
+          const cost = Number.isFinite(buyState.cost) ? `${formatNumber(buyState.cost)}T` : "最大";
+          const state = buyState.buyable ? "購入" : (buyState.insufficient ? "不足" : (buyState.locked ? "ロック" : "最大"));
           slot.innerHTML = `
             <div class="slot-buy-card">
               <div class="slot-buy-icon">+</div>
               <div class="slot-buy-copy">
-                <div class="slot-tag">BALL ${i + 1}</div>
+                <div class="slot-tag">ボール${i + 1}</div>
                 <div class="slot-buy-price">${cost}</div>
               </div>
             </div>
@@ -336,7 +336,7 @@ const UI = {
         slot.innerHTML = `
           <div class="slot-top">
             <div class="slot-icon"></div>
-            <div class="slot-tag">BALL ${i + 1}</div>
+            <div class="slot-tag">ボール${i + 1}</div>
           </div>
           <div class="slot-skills-stack">${emptyRows}</div>
         `;
@@ -376,8 +376,8 @@ const UI = {
 
       // ボール状態のタグ（READY表示）
       const ballTag = launchReady
-        ? `BALL ${i + 1} ▶`
-        : `BALL ${i + 1}`;
+        ? `ボール${i + 1} ▶`
+        : `ボール${i + 1}`;
 
       slot.className = `slot owned ${ball.alive || launchReady ? "" : "fallen reviving"} ${ball.skills.length ? "has-skills" : "no-skills"} ${launchReady ? "launch-ready" : ""} ${selected ? (isSkillSelect ? "selected-skill" : "selected-upgrade") : ""}`;
       slot.style.borderColor = first ? first.color : ball.color;
@@ -415,8 +415,8 @@ const UI = {
     paddleSlot.style.setProperty("--selected-color", firstPaddle ? firstPaddle.color : "#f6fbff");
     paddleSlot.innerHTML = `
       <div class="slot-paddle-icon"></div>
-      <span class="slot-tag">PADDLE</span>
-      <span class="slot-name">${firstPaddle ? this.skillDisplayName(firstPaddle) : "NO SKILL"}</span>
+      <span class="slot-tag">パドル</span>
+      <span class="slot-name">${firstPaddle ? this.skillDisplayName(firstPaddle) : "スキルなし"}</span>
       <span class="slot-lv">★${total}</span>
     `;
     paddleSlot.onclick = () => {
@@ -436,11 +436,11 @@ const UI = {
       const maxHp = owned && bumper ? bumper.maxHp : 0;
       const hp = owned && bumper ? bumper.hp : 0;
       const broken = owned && bumper ? bumper.broken : false;
-      const seconds = bumper && bumper.reviveTimer ? `${Math.ceil(bumper.reviveTimer)}s` : "READY";
+      const seconds = bumper && bumper.reviveTimer ? `${Math.ceil(bumper.reviveTimer)}秒` : "準備OK";
       const bumperStars = Math.min(10, level);
       const skillLabel = firstBumper
         ? `${this.skillDisplayName(firstBumper)}${bumper.skills.length > 1 ? " +1" : ""}`
-        : (owned ? "NO SKILL" : "LEVEL 0");
+        : (owned ? "スキルなし" : "Lv 0");
       const buyState = this.getBumperSlotState(bumper);
       const detailLabel = owned && firstBumper ? skillLabel : (buyState.detail || skillLabel);
       const dots = Array.from({ length: Math.max(1, maxHp) }, (_, index) => (
@@ -454,7 +454,7 @@ const UI = {
         // ロック中: シンプルな表示
         bumperSlot.innerHTML = `
           <div class="slot-bumper-icon empty"></div>
-          <span class="slot-tag">BUMPER</span>
+          <span class="slot-tag">バンパー</span>
           <span class="slot-name">${buyState.label}</span>
           <span class="slot-lv">${buyState.detail}</span>
         `;
@@ -465,9 +465,9 @@ const UI = {
         // 所有済み: アイコン + BUMPER + HPドット + スキル名
         bumperSlot.innerHTML = `
           <div class="slot-bumper-icon"></div>
-          <span class="slot-tag">BUMPER</span>
+          <span class="slot-tag">バンパー</span>
           <div class="bumper-dots-compact">${compactDots}</div>
-          <span class="slot-name">${broken ? `${seconds} REVIVING` : skillLabel}</span>
+          <span class="slot-name">${broken ? `${seconds} 復帰中` : skillLabel}</span>
         `;
       }
       bumperSlot.onclick = () => {
@@ -490,21 +490,21 @@ const UI = {
     const ballNumber = slotIndex + 1;
     const nextBallNumber = balls.length + 1;
     const cost = getBallPurchaseCost(ballNumber);
-    const price = Number.isFinite(cost) ? `PRICE ${formatNumber(cost)}T` : "MAX";
+    const price = Number.isFinite(cost) ? `トークン ${formatNumber(cost)}T` : "最大";
     const tokens = typeof Game !== "undefined" ? Number(Game.tokens || 0) : 0;
     const affordable = Number.isFinite(cost) && tokens >= cost;
     const bumperUnlocked = typeof Game !== "undefined" && Game.bumper && Game.bumper.unlocked;
     const bumperBonus = ballNumber >= 2
-      ? `<span class="slot-lock">${bumperUnlocked ? `+ BUMPER LV ${Math.min(ballNumber, BALL_MAX - 1)}` : `BUMPER ${formatNumber(BUMPER_UNLOCK_COST)}T`}</span>`
+      ? `<span class="slot-lock">${bumperUnlocked ? `+ バンパーLv ${Math.min(ballNumber, BALL_MAX - 1)}` : `バンパー ${formatNumber(BUMPER_UNLOCK_COST)}T`}</span>`
       : "";
     if (!this.canBuyBallInCurrentPhase()) {
-      return { label: "EMPTY", detail: "NO SKILL", shortDetail: "NO SKILL", buyable: false, locked: false, insufficient: false, cost };
+      return { label: "空き", detail: "スキルなし", shortDetail: "スキルなし", buyable: false, locked: false, insufficient: false, cost };
     }
     if (ballNumber !== nextBallNumber) {
       return {
-        label: "LOCKED",
-        detail: `<span class="slot-price">${price}</span><span class="slot-lock">BALL ${nextBallNumber} FIRST</span>${bumperBonus}`,
-        shortDetail: `BALL ${nextBallNumber} FIRST`,
+        label: "ロック",
+        detail: `<span class="slot-price">${price}</span><span class="slot-lock">先にボール${nextBallNumber}</span>${bumperBonus}`,
+        shortDetail: `先にボール${nextBallNumber}`,
         buyable: false,
         locked: true,
         insufficient: false,
@@ -512,9 +512,9 @@ const UI = {
       };
     }
     return {
-      label: affordable ? `BUY ${formatNumber(cost)}T` : `NEED ${formatNumber(cost)}T`,
-      detail: `<span class="slot-price">${price}</span><span class="slot-lock">BALL ${ballNumber}</span>${bumperBonus}`,
-      shortDetail: affordable ? "AVAILABLE" : `${formatNumber(Math.max(0, cost - tokens))}T SHORT`,
+      label: affordable ? `購入 ${formatNumber(cost)}T` : `不足 ${formatNumber(cost)}T`,
+      detail: `<span class="slot-price">${price}</span><span class="slot-lock">ボール${ballNumber}</span>${bumperBonus}`,
+      shortDetail: affordable ? "購入可" : `${formatNumber(Math.max(0, cost - tokens))}T不足`,
       buyable: affordable,
       locked: false,
       insufficient: Number.isFinite(cost) && !affordable,
@@ -524,24 +524,24 @@ const UI = {
 
   handleEmptyBallSlotClick(slotIndex) {
     if (!this.canBuyBallInCurrentPhase()) {
-      this.showToast("EMPTY BALL SLOT");
+      this.showToast("空きボール枠です");
       return;
     }
     const nextBallNumber = Game.balls.length + 1;
     const ballNumber = slotIndex + 1;
     if (ballNumber !== nextBallNumber) {
-      this.showToast(`BUY BALL ${nextBallNumber} FIRST`);
+      this.showToast(`先にボール${nextBallNumber}を購入してください`);
       return;
     }
     const cost = getBallPurchaseCost(ballNumber);
     if (Game.tokens < cost) {
-      this.showToast(`NEED ${formatNumber(cost)} TOKENS`);
+      this.showToast(`トークンが${formatNumber(cost)}必要です`);
       return;
     }
     this.showConfirm({
-      title: `BUY BALL ${ballNumber}`,
-      message: `Use ${formatNumber(cost)} tokens?`,
-      confirmLabel: "BUY",
+      title: `ボール${ballNumber}を購入`,
+      message: `${formatNumber(cost)}トークンを使いますか？`,
+      confirmLabel: "購入",
       onConfirm: () => Game.buyNextBallWithTokens()
     });
   },
@@ -560,8 +560,8 @@ const UI = {
       const price = formatNumber(BUMPER_UNLOCK_COST);
       const affordable = typeof Game !== "undefined" && Number(Game.tokens || 0) >= BUMPER_UNLOCK_COST;
       return {
-        label: canBuy ? (affordable ? `BUY ${price}T` : `NEED ${price}T`) : "LOCKED",
-        detail: `<span class="slot-price">PRICE ${price}T</span>`,
+        label: canBuy ? (affordable ? `購入 ${price}T` : `不足 ${price}T`) : "ロック",
+        detail: `<span class="slot-price">トークン ${price}T</span>`,
         buyable: canBuy && affordable,
         locked: !canBuy,
         insufficient: canBuy && !affordable
@@ -569,7 +569,7 @@ const UI = {
     }
     return {
       label: `Lv ${level}`,
-      detail: level >= autoMax ? "AUTO MAX" : `NEXT: BALL ${level + 2}`,
+      detail: level >= autoMax ? "自動最大" : `次: ボール${level + 2}`,
       buyable: false,
       locked: false,
       insufficient: false
@@ -588,18 +588,18 @@ const UI = {
 
   confirmBumperPurchase(bumper) {
     if (!bumper || bumper.unlocked) {
-      this.showToast("BUMPER ALREADY UNLOCKED");
+      this.showToast("バンパーは解放済みです");
       return;
     }
     if (Game.tokens < BUMPER_UNLOCK_COST) {
-      this.showToast(`NEED ${formatNumber(BUMPER_UNLOCK_COST)} TOKENS`);
+      this.showToast(`トークンが${formatNumber(BUMPER_UNLOCK_COST)}必要です`);
       return;
     }
     const cost = formatNumber(BUMPER_UNLOCK_COST);
     this.showConfirm({
-      title: "UNLOCK BUMPER",
-      message: `Use ${cost} tokens?`,
-      confirmLabel: "UNLOCK",
+      title: "バンパー解放",
+      message: `${cost}トークンを使いますか？`,
+      confirmLabel: "解放",
       onConfirm: () => Game.buyBumperLevelWithTokens()
     });
   },
@@ -610,19 +610,19 @@ const UI = {
       <span class="slot-skill-chip ${index === 0 ? "primary" : ""}" style="--skill-color:${skill.color || "var(--accent-blue)"}">
         <span class="slot-skill-dot"></span>
         <span class="slot-skill-text">${name}</span>
-        <span class="slot-skill-level">LV ${skill.level}</span>
+        <span class="slot-skill-level">Lv ${skill.level}</span>
       </span>
     `;
   },
 
   skillFullName(skill) {
-    if (!skill) return "SKILL";
-    return skill.name || SLOT_SKILL_LABELS[skill.id] || skill.shortName || skill.id || "SKILL";
+    if (!skill) return "スキル";
+    return skill.name || SLOT_SKILL_LABELS[skill.id] || skill.shortName || skill.id || "スキル";
   },
 
   skillDisplayName(skill) {
-    if (!skill) return "SKILL";
-    return SLOT_SKILL_LABELS[skill.id] || skill.shortName || skill.name || skill.id || "SKILL";
+    if (!skill) return "スキル";
+    return SLOT_SKILL_LABELS[skill.id] || skill.shortName || skill.name || skill.id || "スキル";
   },
 
   escapeHtml(value) {
@@ -643,7 +643,7 @@ const UI = {
 
   skillDescription(choice) {
     if (!choice) return "";
-    return SKILL_DETAIL_TEXT[choice.id] || choice.description || "";
+    return choice.description || SKILL_DETAIL_TEXT[choice.id] || "";
   },
 
   skillLevelText(choice, level = 1) {
@@ -768,9 +768,9 @@ const UI = {
       if (rerollRow) {
         const disabled = Game.tokens < cost;
         rerollRow.innerHTML = `
-          <div class="skill-reroll-status"><span>TOKENS</span><b>${formatNumber(Game.tokens)}</b></div>
+          <div class="skill-reroll-status"><span>トークン</span><b>${formatNumber(Game.tokens)}</b></div>
           <button id="btn-skill-reroll" class="btn-reroll" type="button" ${disabled ? "disabled" : ""}>
-            REROLL <span>${formatNumber(cost)}</span>
+            リロール <span>${formatNumber(cost)}</span>
           </button>
         `;
         this.updateSkillRerollStatus();
@@ -810,7 +810,7 @@ const UI = {
             onSelect(choice, selectedBall.ball, selectedBall.index);
             return;
           }
-          if (selectedBall) this.showToast("SELECTED BALL IS FULL");
+          if (selectedBall) this.showToast("選択中のボールは満杯です");
           AudioSystem.playUiOpen();
           this.showBallPicker(choice, balls, onSelect);
         });
@@ -821,7 +821,7 @@ const UI = {
         rerollButton.addEventListener("click", () => {
           const cost = getSkillRerollCost();
           if (Game.tokens < cost) {
-            this.showToast("NOT ENOUGH TOKENS");
+            this.showToast("トークンが足りません");
             return;
           }
           Game.tokens -= cost;
@@ -859,7 +859,7 @@ const UI = {
       const filled = index < current;
       return `<span class="skill-star ${filled ? "filled" : "empty"}">${filled ? "★" : "☆"}</span>`;
     }).join("");
-    return `<span class="skill-stars" aria-label="LEVEL ${current} OF ${safeMax}">${stars}</span>`;
+    return `<span class="skill-stars" aria-label="レベル ${current} / ${safeMax}">${stars}</span>`;
   },
 
   skillNameFontSize(name = "") {
@@ -875,8 +875,17 @@ const UI = {
     const isAdd = choice.type === "addBall";
     const description = this.skillDescription(choice);
     const level = clamp(choice.level || 1, 1, 5);
-    const category = isAdd ? "NEW BALL" : choice.category.toUpperCase();
-    const levelBadge = isAdd ? `<span class="skill-stars skill-stars-empty">NEW</span>` : this.skillStarLevelHtml(level);
+    const categoryLabels = {
+      attack: "攻撃",
+      movement: "移動",
+      special: "特殊",
+      economy: "収集",
+      recovery: "回復",
+      paddle: "パドル",
+      bumper: "バンパー"
+    };
+    const category = isAdd ? "新ボール" : (categoryLabels[choice.category] || choice.category || "スキル");
+    const levelBadge = isAdd ? `<span class="skill-stars skill-stars-empty">新規</span>` : this.skillStarLevelHtml(level);
     const nameSize = this.skillNameFontSize(choice.name);
     return `
       <button class="skill-card ${isAdd ? "add-ball" : ""}" style="--skill-color:${choice.color}" type="button">
@@ -907,7 +916,7 @@ const UI = {
       if (this.isSkillTargetSelected(index)) slot.classList.add("selected-skill");
       slot.onclick = () => {
         if (!canEquip) {
-          this.showToast("THIS BALL IS FULL");
+          this.showToast("このボールは満杯です");
           return;
         }
         onSelect(choice, ball, index);
@@ -926,9 +935,9 @@ const UI = {
     const targetBall = target ? target.ball : balls[0];
     const targetIndex = target ? target.index : 0;
     const targetColor = choice ? (choice.color || "#ffffff") : (targetBall ? ((targetBall.skills[0] ? targetBall.skills[0].color : targetBall.color) || "#ffffff") : "#ffffff");
-    const title = choice ? choice.name : "SELECT TARGET";
-    const modeLabel = choice ? "APPLY SKILL TO" : "CURRENT TARGET";
-    const selectedSkills = targetBall ? this.targetSkillListHtml(targetBall) : `<span class="target-skill-empty">EMPTY</span>`;
+    const title = choice ? choice.name : "対象を選択";
+    const modeLabel = choice ? "スキルの対象" : "現在の対象";
+    const selectedSkills = targetBall ? this.targetSkillListHtml(targetBall) : `<span class="target-skill-empty">空き</span>`;
     const options = balls.map((ball, index) => {
       const canEquip = choice ? canEquipSkill(ball, choice.id) : true;
       const first = ball.skills[0];
@@ -941,12 +950,12 @@ const UI = {
           <span class="ball-target-head">
             <span class="ball-target-icon" style="${this.ballIconStyle(ball)}"></span>
             <span class="ball-target-copy">
-              <span class="ball-target-label">BALL ${index + 1}</span>
-              <span class="ball-target-name">${slotCount} SLOTS</span>
+              <span class="ball-target-label">ボール${index + 1}</span>
+              <span class="ball-target-name">${slotCount} 枠</span>
             </span>
           </span>
           <span class="ball-target-skills">${skills}</span>
-          <span class="ball-target-state">${selected ? "SELECTED" : (canEquip ? (choice ? "APPLY" : "SELECT") : "FULL")}</span>
+          <span class="ball-target-state">${selected ? "選択中" : (canEquip ? (choice ? "適用" : "選択") : "満杯")}</span>
         </button>
       `;
     }).join("");
@@ -956,10 +965,10 @@ const UI = {
           <span class="target-avatar" style="${targetBall ? this.ballIconStyle(targetBall) : `background:${targetColor}`}"></span>
           <span class="target-copy">
             <span class="target-kicker">${modeLabel}</span>
-            <span class="target-title">${targetBall ? `BALL ${targetIndex + 1}` : title}</span>
+            <span class="target-title">${targetBall ? `ボール${targetIndex + 1}` : title}</span>
             <span class="target-selected-skills">${selectedSkills}</span>
           </span>
-          <span class="target-selected-pill">${choice ? "CHOOSE" : `${targetBall ? targetBall.skills.length : 0}/3 SLOT`}</span>
+          <span class="target-selected-pill">${choice ? "選ぶ" : `${targetBall ? targetBall.skills.length : 0}/3 枠`}</span>
         </div>
         <div class="skill-target-grid" style="--target-count:${Math.max(1, Math.min(4, balls.length))}">${options}</div>
       </div>
@@ -968,7 +977,7 @@ const UI = {
 
   targetSkillListHtml(entity) {
     if (!entity || !entity.skills || entity.skills.length === 0) {
-      return `<span class="target-skill-empty">EMPTY</span>`;
+      return `<span class="target-skill-empty">空き</span>`;
     }
     return entity.skills.map((skill) => `
       <span class="target-skill-chip" style="--skill-color:${skill.color || "var(--accent-blue)"}">
@@ -1120,9 +1129,9 @@ const UI = {
   },
 
   upgradeTargetLabel(target) {
-    if (target.type === "ball") return `BALL ${target.index + 1}`;
-    if (target.type === "paddle") return "PADDLE";
-    return "BUMPER";
+    if (target.type === "ball") return `ボール${target.index + 1}`;
+    if (target.type === "paddle") return "パドル";
+    return "バンパー";
   },
 
   upgradeTargetPanelHtml(target, balls) {
@@ -1153,21 +1162,21 @@ const UI = {
       const color = ball ? (ball.skills[0] ? ball.skills[0].color : ball.color) : "#ffffff";
       const damage = ball ? Math.round(ball.getBaseDamage ? ball.getBaseDamage(Game) : 100 + ball.baseDamageBonus + ball.upgrades.damage * 50) : 0;
       return {
-        title: `BALL ${target.index + 1}`,
+        title: `ボール${target.index + 1}`,
         color,
         icon: `<span class="target-avatar ball-avatar" style="${ball ? this.ballIconStyle(ball) : "background:#ffffff"}"></span>`,
-        status: ball ? `${ball.skills.length}/3 SKILL SLOTS` : "EMPTY",
-        power: `DMG ${formatNumber(damage)}`,
+        status: ball ? `${ball.skills.length}/3 スキル枠` : "空き",
+        power: `攻撃 ${formatNumber(damage)}`,
         skills: this.targetSkillListHtml(ball)
       };
     }
     if (target.type === "paddle") {
       return {
-        title: "PADDLE",
+        title: "パドル",
         color: "#f6fbff",
         icon: `<span class="target-avatar paddle-avatar"></span>`,
         status: `HP ${Math.ceil(Game.paddle.hp)} / ${Math.ceil(Game.paddle.maxHp)}`,
-        power: `WIDTH ${Math.round(Game.paddle.getWidth())}`,
+        power: `幅 ${Math.round(Game.paddle.getWidth())}`,
         skills: this.targetSkillListHtml(Game.paddle)
       };
     }
@@ -1176,11 +1185,11 @@ const UI = {
     const level = bumper ? (bumper.level || 0) : 0;
     const unlocked = bumper && bumper.unlocked;
     return {
-      title: "BUMPER",
+      title: "バンパー",
       color,
       icon: `<span class="target-avatar bumper-avatar"></span>`,
-      status: unlocked ? `AUTO LV ${level}/${BALL_MAX - 1}` : "LOCKED",
-      power: unlocked && level > 0 && bumper ? `HP ${Math.ceil(bumper.hp)} / ${Math.ceil(bumper.maxHp)}` : `UNLOCK ${formatNumber(BUMPER_UNLOCK_COST)}T`,
+      status: unlocked ? `自動 Lv ${level}/${BALL_MAX - 1}` : "ロック",
+      power: unlocked && level > 0 && bumper ? `HP ${Math.ceil(bumper.hp)} / ${Math.ceil(bumper.maxHp)}` : `解放 ${formatNumber(BUMPER_UNLOCK_COST)}T`,
       skills: this.targetSkillListHtml(bumper)
     };
   },
@@ -1193,7 +1202,7 @@ const UI = {
       const color = ball ? (ball.skills[0] ? ball.skills[0].color : ball.color) : "rgba(255,255,255,0.24)";
       const buyState = ball ? null : this.getBallPurchaseSlotState(i, balls);
       const canBuyEmpty = !ball && buyState && buyState.buyable;
-      const emptyLabel = canBuyEmpty ? "BUY" : (buyState && buyState.insufficient ? "NEED" : (buyState && buyState.locked ? "LOCK" : "EMPTY"));
+      const emptyLabel = canBuyEmpty ? "購入" : (buyState && buyState.insufficient ? "不足" : (buyState && buyState.locked ? "ロック" : "空き"));
       choices.push(`
         <button class="upgrade-target-choice ${selected ? "selected" : ""} ${ball ? "" : "empty"} ${canBuyEmpty ? "buyable" : ""} ${buyState && buyState.insufficient ? "insufficient" : ""}" type="button" data-type="ball" data-index="${i}" style="--target-color:${color}">
           <span class="upgrade-target-choice-icon" style="${ball ? this.ballIconStyle(ball) : "background:rgba(255,255,255,0.1);box-shadow:none"}"></span>
@@ -1209,15 +1218,15 @@ const UI = {
     choices.push(`
       <button class="upgrade-target-choice wide ${paddleSelected ? "selected" : ""}" type="button" data-type="paddle" style="--target-color:#f6fbff">
         <span class="upgrade-target-choice-paddle"></span>
-        <span class="upgrade-target-choice-label">PADDLE</span>
+        <span class="upgrade-target-choice-label">パドル</span>
         <span class="upgrade-target-choice-state">HP</span>
       </button>
     `);
     choices.push(`
       <button class="upgrade-target-choice wide ${bumperSelected ? "selected" : ""}" type="button" data-type="bumper" style="--target-color:#67d8ff">
         <span class="upgrade-target-choice-bumper"></span>
-        <span class="upgrade-target-choice-label">BUMPER</span>
-        <span class="upgrade-target-choice-state">${bumperUnlocked ? `AUTO ${bumperLevel}/${BALL_MAX - 1}` : `${formatNumber(BUMPER_UNLOCK_COST)}T`}</span>
+        <span class="upgrade-target-choice-label">バンパー</span>
+        <span class="upgrade-target-choice-state">${bumperUnlocked ? `自動 ${bumperLevel}/${BALL_MAX - 1}` : `${formatNumber(BUMPER_UNLOCK_COST)}T`}</span>
       </button>
     `);
     return `<div class="upgrade-target-strip">${choices.join("")}</div>`;
@@ -1233,10 +1242,10 @@ const UI = {
   upgradeBallHtml(ball, ballIndex) {
     if (!ball) return "";
     const labels = {
-      speed: "SPEED",
-      damage: "DAMAGE",
-      reviveSpeed: "SPAWN",
-      critRate: "CRITICAL"
+      speed: "速度",
+      damage: "攻撃",
+      reviveSpeed: "復帰",
+      critRate: "会心"
     };
     const rows = ["speed", "damage", "reviveSpeed", "critRate"].map((key) => {
       const definition = UPGRADE_DEFS[key];
@@ -1247,9 +1256,9 @@ const UI = {
       const isMax = level >= definition.max;
       const canBuy = !isMax && Game.tokens >= cost;
       const buttonHint = level >= definition.max
-        ? `${labels[key]} MAX`
+        ? `${labels[key]} 最大`
         : `${labels[key]} ${formatNumber(cost)}T`;
-      const priceText = isMax ? "MAX" : `${this.compactUpgradeCost(cost)}T`;
+      const priceText = isMax ? "最大" : `${this.compactUpgradeCost(cost)}T`;
       const fill = clamp((level / Math.max(1, definition.max)) * 100, 0, 100);
       return `
         <div class="upgrade-row simple-upgrade-row">
@@ -1258,7 +1267,7 @@ const UI = {
               <div class="upgrade-name">${labels[key]}</div>
               <div class="upgrade-gauge">LV ${level}/${definition.max}</div>
             </div>
-            <div class="upgrade-level-meter" style="--level-fill:${fill}%" aria-label="${labels[key]} LEVEL ${level}/${definition.max}">
+            <div class="upgrade-level-meter" style="--level-fill:${fill}%" aria-label="${labels[key]} レベル ${level}/${definition.max}">
               <span class="upgrade-level-fill"></span>
             </div>
           </div>
@@ -1267,7 +1276,7 @@ const UI = {
               <span class="upgrade-price-token"></span>
               <b>${priceText}</b>
             </span>
-            <button class="btn-buy btn-upgrade-buy" data-ball="${ballIndex}" data-key="${key}" title="${buttonHint}" aria-label="${buttonHint}" ${disabled ? "disabled" : ""}>BUY</button>
+            <button class="btn-buy btn-upgrade-buy" data-ball="${ballIndex}" data-key="${key}" title="${buttonHint}" aria-label="${buttonHint}" ${disabled ? "disabled" : ""}>購入</button>
           </div>
         </div>
       `;
@@ -1295,7 +1304,7 @@ const UI = {
       <section class="upgrade-ball upgrade-target">
         <div class="upgrade-ball-title">
           <span class="slot-paddle-icon"></span>
-          <span>PADDLE</span>
+          <span>パドル</span>
         </div>
         <div class="upgrade-row">
           <div>
@@ -1309,8 +1318,8 @@ const UI = {
         </div>
         <div class="upgrade-row">
           <div>
-            <div class="upgrade-name">WIDTH</div>
-            <div class="upgrade-gauge">SKILL +${getSkillLevel(paddle, "paddleWidth")}</div>
+            <div class="upgrade-name">幅</div>
+            <div class="upgrade-gauge">スキル +${getSkillLevel(paddle, "paddleWidth")}</div>
           </div>
           <div class="upgrade-actions">
             <span class="upgrade-value">${width}</span>
@@ -1336,29 +1345,29 @@ const UI = {
         <section class="upgrade-ball upgrade-target">
           <div class="upgrade-ball-title">
             <span class="slot-bumper-icon empty"></span>
-            <span>BUMPER</span>
+            <span>バンパー</span>
           </div>
           <div class="upgrade-row">
             <div>
-              <div class="upgrade-name">UNLOCK</div>
-              <div class="upgrade-gauge">REQUIRES ${formatNumber(BUMPER_UNLOCK_COST)}T</div>
+              <div class="upgrade-name">解放</div>
+              <div class="upgrade-gauge">${formatNumber(BUMPER_UNLOCK_COST)}T 必要</div>
               <div class="upgrade-meter" style="--fill:${Math.min(100, (Game.tokens / BUMPER_UNLOCK_COST) * 100)}%"></div>
             </div>
             <div class="upgrade-actions">
               <span class="upgrade-cost">${formatNumber(BUMPER_UNLOCK_COST)}</span>
-              <button class="btn-buy btn-bumper-buy" type="button" ${canBuy ? "" : "disabled"}>BUY</button>
+              <button class="btn-buy btn-bumper-buy" type="button" ${canBuy ? "" : "disabled"}>購入</button>
             </div>
           </div>
           <div class="upgrade-row">
             <div>
-              <div class="upgrade-name">AUTO LINK</div>
-              <div class="upgrade-gauge">LOCKED</div>
+              <div class="upgrade-name">自動連携</div>
+              <div class="upgrade-gauge">ロック中</div>
             </div>
             <div class="upgrade-actions">
-              <span class="upgrade-value">OFF</span>
+              <span class="upgrade-value">オフ</span>
             </div>
           </div>
-          <div class="upgrade-skill-box"><span class="upgrade-skill-empty">UNLOCK FIRST</span></div>
+          <div class="upgrade-skill-box"><span class="upgrade-skill-empty">先に解放</span></div>
         </section>
       `;
     }
@@ -1366,34 +1375,34 @@ const UI = {
       <section class="upgrade-ball upgrade-target">
         <div class="upgrade-ball-title">
           <span class="slot-bumper-icon ${level > 0 ? "" : "empty"}"></span>
-          <span>BUMPER</span>
+          <span>バンパー</span>
         </div>
         <div class="upgrade-row">
           <div>
-            <div class="upgrade-name">AUTO LINK</div>
-            <div class="upgrade-gauge">BALLS ${ballCount}/${BALL_MAX} / BUMPER LV ${level}/${autoMax}</div>
+            <div class="upgrade-name">自動連携</div>
+            <div class="upgrade-gauge">ボール ${ballCount}/${BALL_MAX} / バンパーLv ${level}/${autoMax}</div>
             <div class="upgrade-meter" style="--fill:${levelFill}%"></div>
           </div>
           <div class="upgrade-actions">
-            <span class="upgrade-value">${level >= autoMax ? "AUTO MAX" : `BALL ${nextBall}`}</span>
+            <span class="upgrade-value">${level >= autoMax ? "自動最大" : `ボール${nextBall}`}</span>
           </div>
         </div>
         <div class="upgrade-row">
           <div>
             <div class="upgrade-name">HP</div>
-            <div class="upgrade-gauge">${level > 0 ? hp : "UNLOCK FIRST"}</div>
+            <div class="upgrade-gauge">${level > 0 ? hp : "先に解放"}</div>
           </div>
           <div class="upgrade-actions">
-            <span class="upgrade-value">${level > 0 ? hp : "NONE"}</span>
+            <span class="upgrade-value">${level > 0 ? hp : "なし"}</span>
           </div>
         </div>
         <div class="upgrade-row">
           <div>
-            <div class="upgrade-name">RECOVER</div>
-            <div class="upgrade-gauge">LEVEL +${getSkillLevel(bumper, "bumperRecover")}</div>
+            <div class="upgrade-name">復帰</div>
+            <div class="upgrade-gauge">レベル +${getSkillLevel(bumper, "bumperRecover")}</div>
           </div>
           <div class="upgrade-actions">
-            <span class="upgrade-value">${level > 0 && bumper ? bumper.getReviveTime().toFixed(1) : "LOCKED"}${level > 0 ? "s" : ""}</span>
+            <span class="upgrade-value">${level > 0 && bumper ? bumper.getReviveTime().toFixed(1) : "ロック"}${level > 0 ? "秒" : ""}</span>
           </div>
         </div>
         <div class="upgrade-skill-box">${skills}</div>
@@ -1403,7 +1412,7 @@ const UI = {
 
   upgradeSkillListHtml(entity) {
     if (!entity || !entity.skills || entity.skills.length === 0) {
-      return `<span class="upgrade-skill-empty">NO SKILL</span>`;
+      return `<span class="upgrade-skill-empty">スキルなし</span>`;
     }
     return entity.skills.map((skill) => this.slotSkillChip(skill)).join("");
   },
@@ -1412,13 +1421,13 @@ const UI = {
     const root = document.getElementById("gameover-card");
     root.innerHTML = `
       <div class="gameover-card">
-        <p class="gameover-title">GAME OVER</p>
+        <p class="gameover-title">ゲームオーバー</p>
         <p class="gameover-score" id="go-score">0</p>
-        <p class="gameover-best">BEST: ${formatNumber(highScore)}</p>
-        <p class="gameover-meta">BLOCKS: ${formatNumber(blocksDestroyed)}</p>
-        <p class="gameover-meta">BEST BLOCKS: ${formatNumber(bestBlocks)}</p>
+        <p class="gameover-best">最高: ${formatNumber(highScore)}</p>
+        <p class="gameover-meta">破壊ブロック: ${formatNumber(blocksDestroyed)}</p>
+        <p class="gameover-meta">最高ブロック: ${formatNumber(bestBlocks)}</p>
         <div class="gameover-divider"></div>
-        <button class="btn-start" id="btn-retry">PLAY AGAIN</button>
+        <button class="btn-start" id="btn-retry">もう一度</button>
       </div>
     `;
     const scoreNode = document.getElementById("go-score");
@@ -1444,12 +1453,12 @@ const UI = {
     const title = document.getElementById("screen-title");
     title.innerHTML = `
       <div class="simple-card">
-        <p class="simple-title">RANKING</p>
-        <p class="simple-line">BEST SCORE</p>
+        <p class="simple-title">ランキング</p>
+        <p class="simple-line">最高スコア</p>
         <p class="gameover-score">${formatNumber(highScore)}</p>
-        <p class="simple-line">BEST BLOCKS ${formatNumber(bestBlocks)}</p>
+        <p class="simple-line">最高ブロック ${formatNumber(bestBlocks)}</p>
         <div class="simple-divider"></div>
-        <button class="btn-sub" id="btn-back">BACK</button>
+        <button class="btn-sub" id="btn-back">戻る</button>
       </div>
     `;
     document.getElementById("btn-back").addEventListener("click", () => this.initTitle());
@@ -1464,36 +1473,36 @@ const UI = {
     const effectsEnabled = typeof Effects === "undefined" || !Effects.isEnabled || Effects.isEnabled();
     title.innerHTML = `
       <div class="simple-card settings-card">
-        <p class="simple-title">SETTINGS</p>
+        <p class="simple-title">設定</p>
         <div class="settings-group">
           <div class="settings-head">
-            <span>CONTROL</span>
-            <b id="setting-control-label">${settings.mode === "drag" ? "DRAG" : "DIRECT"}</b>
+            <span>操作方法</span>
+            <b id="setting-control-label">${settings.mode === "drag" ? "ドラッグ" : "ダイレクト"}</b>
           </div>
           <div class="settings-segmented" role="group" aria-label="control mode">
-            <button class="settings-option ${settings.mode === "direct" ? "active" : ""}" type="button" data-mode="direct">DIRECT</button>
-            <button class="settings-option ${settings.mode === "drag" ? "active" : ""}" type="button" data-mode="drag">DRAG</button>
+            <button class="settings-option ${settings.mode === "direct" ? "active" : ""}" type="button" data-mode="direct">ダイレクト</button>
+            <button class="settings-option ${settings.mode === "drag" ? "active" : ""}" type="button" data-mode="drag">ドラッグ</button>
           </div>
         </div>
         <div class="settings-group">
           <div class="settings-head">
-            <span>SENSITIVITY</span>
+            <span>感度</span>
             <b id="setting-sensitivity-value">${sensitivity}%</b>
           </div>
           <input id="setting-sensitivity" class="settings-range" type="range" min="60" max="250" step="5" value="${sensitivity}">
         </div>
         <div class="settings-group">
           <div class="settings-head">
-            <span>EFFECTS</span>
-            <b id="setting-effects-label">${effectsEnabled ? "ON" : "OFF"}</b>
+            <span>エフェクト</span>
+            <b id="setting-effects-label">${effectsEnabled ? "オン" : "オフ"}</b>
           </div>
           <div class="settings-segmented" role="group" aria-label="effects">
-            <button class="settings-option effect-option ${effectsEnabled ? "active" : ""}" type="button" data-effects="on">ON</button>
-            <button class="settings-option effect-option ${!effectsEnabled ? "active" : ""}" type="button" data-effects="off">OFF</button>
+            <button class="settings-option effect-option ${effectsEnabled ? "active" : ""}" type="button" data-effects="on">オン</button>
+            <button class="settings-option effect-option ${!effectsEnabled ? "active" : ""}" type="button" data-effects="off">オフ</button>
           </div>
         </div>
         <div class="simple-divider"></div>
-        <button class="btn-sub" id="btn-back">BACK</button>
+        <button class="btn-sub" id="btn-back">戻る</button>
       </div>
     `;
     const applyInputSettings = () => {
@@ -1507,7 +1516,7 @@ const UI = {
         : { mode: "direct", sensitivity: 1 };
       const label = document.getElementById("setting-control-label");
       const value = document.getElementById("setting-sensitivity-value");
-      if (label) label.textContent = next.mode === "drag" ? "DRAG" : "DIRECT";
+      if (label) label.textContent = next.mode === "drag" ? "ドラッグ" : "ダイレクト";
       if (value) value.textContent = `${Math.round(next.sensitivity * 100)}%`;
     };
     title.querySelectorAll(".settings-option[data-mode]").forEach((button) => {
@@ -1526,7 +1535,7 @@ const UI = {
         if (typeof Effects !== "undefined" && Effects.setEnabled) Effects.setEnabled(enabled);
         if (!enabled && typeof TokenManager !== "undefined" && TokenManager.clear) TokenManager.clear();
         const label = document.getElementById("setting-effects-label");
-        if (label) label.textContent = enabled ? "ON" : "OFF";
+        if (label) label.textContent = enabled ? "オン" : "オフ";
         AudioSystem.playUiOpen();
       });
     });
@@ -1544,36 +1553,36 @@ const UI = {
     const sensitivity = Math.round((settings.sensitivity || 1) * 100);
     const effectsEnabled = typeof Effects === "undefined" || !Effects.isEnabled || Effects.isEnabled();
     root.innerHTML = `
-      <p class="overlay-kicker">PAUSED</p>
-      <h2 class="overlay-title">SETTINGS</h2>
+      <p class="overlay-kicker">一時停止中</p>
+      <h2 class="overlay-title">設定</h2>
       <div class="settings-group">
         <div class="settings-head">
-          <span>CONTROL</span>
-          <b id="pause-setting-control-label">${settings.mode === "drag" ? "DRAG" : "DIRECT"}</b>
+          <span>操作方法</span>
+          <b id="pause-setting-control-label">${settings.mode === "drag" ? "ドラッグ" : "ダイレクト"}</b>
         </div>
         <div class="settings-segmented" role="group" aria-label="control mode">
-          <button class="settings-option ${settings.mode === "direct" ? "active" : ""}" type="button" data-pause-mode="direct">DIRECT</button>
-          <button class="settings-option ${settings.mode === "drag" ? "active" : ""}" type="button" data-pause-mode="drag">DRAG</button>
+          <button class="settings-option ${settings.mode === "direct" ? "active" : ""}" type="button" data-pause-mode="direct">ダイレクト</button>
+          <button class="settings-option ${settings.mode === "drag" ? "active" : ""}" type="button" data-pause-mode="drag">ドラッグ</button>
         </div>
       </div>
       <div class="settings-group">
         <div class="settings-head">
-          <span>SENSITIVITY</span>
+          <span>感度</span>
           <b id="pause-setting-sensitivity-value">${sensitivity}%</b>
         </div>
         <input id="pause-setting-sensitivity" class="settings-range" type="range" min="60" max="250" step="5" value="${sensitivity}">
       </div>
       <div class="settings-group">
         <div class="settings-head">
-          <span>EFFECTS</span>
-          <b id="pause-setting-effects-label">${effectsEnabled ? "ON" : "OFF"}</b>
+          <span>エフェクト</span>
+          <b id="pause-setting-effects-label">${effectsEnabled ? "オン" : "オフ"}</b>
         </div>
         <div class="settings-segmented" role="group" aria-label="effects">
-          <button class="settings-option pause-effect-option ${effectsEnabled ? "active" : ""}" type="button" data-pause-effects="on">ON</button>
-          <button class="settings-option pause-effect-option ${!effectsEnabled ? "active" : ""}" type="button" data-pause-effects="off">OFF</button>
+          <button class="settings-option pause-effect-option ${effectsEnabled ? "active" : ""}" type="button" data-pause-effects="on">オン</button>
+          <button class="settings-option pause-effect-option ${!effectsEnabled ? "active" : ""}" type="button" data-pause-effects="off">オフ</button>
         </div>
       </div>
-      <button class="btn-resume-game" id="btn-resume-game" type="button">RESUME</button>
+      <button class="btn-resume-game" id="btn-resume-game" type="button">再開</button>
     `;
     panel.classList.add("active");
 
@@ -1588,7 +1597,7 @@ const UI = {
         : { mode: "direct", sensitivity: 1 };
       const label = document.getElementById("pause-setting-control-label");
       const value = document.getElementById("pause-setting-sensitivity-value");
-      if (label) label.textContent = next.mode === "drag" ? "DRAG" : "DIRECT";
+      if (label) label.textContent = next.mode === "drag" ? "ドラッグ" : "ダイレクト";
       if (value) value.textContent = `${Math.round(next.sensitivity * 100)}%`;
     };
 
@@ -1608,7 +1617,7 @@ const UI = {
         if (typeof Effects !== "undefined" && Effects.setEnabled) Effects.setEnabled(enabled);
         if (!enabled && typeof TokenManager !== "undefined" && TokenManager.clear) TokenManager.clear();
         const label = document.getElementById("pause-setting-effects-label");
-        if (label) label.textContent = enabled ? "ON" : "OFF";
+        if (label) label.textContent = enabled ? "オン" : "オフ";
         AudioSystem.playUiOpen();
       });
     });
@@ -1642,12 +1651,12 @@ const UI = {
 
   accountSkillSummaryHtml(run) {
     const snapshot = run && run.skills ? run.skills : null;
-    if (!snapshot) return `<p class="account-muted">NO BEST RUN YET</p>`;
+    if (!snapshot) return `<p class="account-muted">ベスト記録はまだありません</p>`;
     const rows = [];
     const addRow = (section) => {
       if (!section || !Array.isArray(section.skills) || section.skills.length === 0) return;
       rows.push({
-        label: section.label || "SKILL",
+        label: section.label || "スキル",
         color: section.color || "var(--accent-blue)",
         skills: section.skills
       });
@@ -1655,10 +1664,10 @@ const UI = {
     if (Array.isArray(snapshot.balls)) snapshot.balls.forEach(addRow);
     addRow(snapshot.paddle);
     addRow(snapshot.bumper);
-    if (rows.length === 0) return `<p class="account-muted">NO SKILLS SAVED</p>`;
+    if (rows.length === 0) return `<p class="account-muted">保存されたスキルはありません</p>`;
     return rows.map((row) => {
       const skills = row.skills
-        .map((skill) => `${this.escapeHtml(skill.name || skill.id || "SKILL")} LV ${Number(skill.level || 1)}`)
+        .map((skill) => `${this.escapeHtml(skill.name || skill.id || "スキル")} Lv ${Number(skill.level || 1)}`)
         .join(" / ");
       return `
         <div class="account-skill-line" style="--account-skill-color:${this.safeCssColor(row.color)}">
@@ -1679,11 +1688,11 @@ const UI = {
         container,
         () => {
           AudioSystem.playUiSuccess();
-          this.showToast("ACCOUNT LINKED");
+          this.showToast("アカウントを連携しました");
           this.showAccount();
         },
         (message) => {
-          if (status) status.textContent = attempt < 10 ? "LOADING GOOGLE" : String(message || "GOOGLE ERROR").toUpperCase();
+          if (status) status.textContent = attempt < 10 ? "Googleを読み込み中" : String(message || "Googleエラー");
         }
       );
       if (!ready && attempt < 12) {
@@ -1698,10 +1707,10 @@ const UI = {
     if (typeof AccountManager === "undefined") {
       title.innerHTML = `
         <div class="simple-card account-card">
-          <p class="simple-title">ACCOUNT</p>
-          <p class="account-muted">ACCOUNT SYSTEM UNAVAILABLE</p>
+          <p class="simple-title">アカウント</p>
+          <p class="account-muted">アカウント機能は利用できません</p>
           <div class="simple-divider"></div>
-          <button class="btn-sub" id="btn-back">BACK</button>
+          <button class="btn-sub" id="btn-back">戻る</button>
         </div>
       `;
       document.getElementById("btn-back").addEventListener("click", () => this.initTitle());
@@ -1713,30 +1722,30 @@ const UI = {
     if (!account) {
       title.innerHTML = `
         <div class="simple-card account-card">
-          <p class="simple-title">ACCOUNT</p>
+          <p class="simple-title">アカウント</p>
           <div class="account-connect-row">
             <span class="account-status-dot ${configured ? "ready" : ""}"></span>
-            <b>${configured ? "GOOGLE READY" : "GOOGLE SETUP"}</b>
+            <b>${configured ? "Google準備OK" : "Google設定"}</b>
           </div>
           ${configured
             ? `
               <div class="google-signin-wrap">
                 <div id="google-signin-button"></div>
-                <p class="account-muted" id="google-signin-status">GOOGLE SIGN-IN</p>
+                <p class="account-muted" id="google-signin-status">Googleでサインイン</p>
               </div>
             `
             : `
               <div class="settings-group">
                 <div class="settings-head">
-                  <span>GOOGLE CLIENT ID</span>
-                  <b>REQUIRED</b>
+                  <span>Google Client ID</span>
+                  <b>必須</b>
                 </div>
-                <input id="account-client-id" class="account-input" type="text" value="${this.escapeHtml(AccountManager.getClientId())}" placeholder="GOOGLE CLIENT ID">
-                <button class="btn-sub account-full-button" id="btn-save-client-id" type="button">SET CLIENT ID</button>
+                <input id="account-client-id" class="account-input" type="text" value="${this.escapeHtml(AccountManager.getClientId())}" placeholder="Google Client ID">
+                <button class="btn-sub account-full-button" id="btn-save-client-id" type="button">IDを保存</button>
               </div>
             `}
           <div class="simple-divider"></div>
-          <button class="btn-sub" id="btn-back">BACK</button>
+          <button class="btn-sub" id="btn-back">戻る</button>
         </div>
       `;
       if (configured) {
@@ -1762,38 +1771,38 @@ const UI = {
       : `<span>${initial}</span>`;
     const bestDate = account.bestRun && account.bestRun.date
       ? new Date(account.bestRun.date).toLocaleDateString()
-      : "NO RUN";
+      : "記録なし";
     title.innerHTML = `
       <div class="simple-card account-card">
-        <p class="simple-title">ACCOUNT</p>
+        <p class="simple-title">アカウント</p>
         <div class="account-profile">
           <div class="account-avatar">${avatar}</div>
           <div class="account-profile-main">
-            <span>GOOGLE LINKED</span>
-            <b>${this.escapeHtml(account.username || "PLAYER")}</b>
+            <span>Google連携済み</span>
+            <b>${this.escapeHtml(account.username || "プレイヤー")}</b>
             <em>${this.escapeHtml(account.email || account.googleName || "")}</em>
           </div>
         </div>
         <div class="settings-group">
           <div class="settings-head">
-            <span>USERNAME</span>
+            <span>ユーザー名</span>
             <b>${String(account.username || "").length}/16</b>
           </div>
           <input id="account-username" class="account-input" type="text" maxlength="16" value="${this.escapeHtml(account.username || "")}">
         </div>
         <div class="account-records">
-          <span><b>${formatNumber(account.highScore || 0)}</b><em>HIGH SCORE</em></span>
-          <span><b>${formatNumber(account.bestBlocks || 0)}</b><em>BEST BLOCKS</em></span>
-          <span><b>${this.escapeHtml(bestDate)}</b><em>BEST RUN</em></span>
+          <span><b>${formatNumber(account.highScore || 0)}</b><em>最高スコア</em></span>
+          <span><b>${formatNumber(account.bestBlocks || 0)}</b><em>最高ブロック</em></span>
+          <span><b>${this.escapeHtml(bestDate)}</b><em>ベスト記録</em></span>
         </div>
         <div class="account-skill-list">
           ${this.accountSkillSummaryHtml(account.bestRun)}
         </div>
         <div class="simple-divider"></div>
         <div class="account-actions">
-          <button class="btn-sub" id="btn-account-save">SAVE</button>
-          <button class="btn-sub" id="btn-account-signout">SIGN OUT</button>
-          <button class="btn-sub" id="btn-back">BACK</button>
+          <button class="btn-sub" id="btn-account-save">保存</button>
+          <button class="btn-sub" id="btn-account-signout">サインアウト</button>
+          <button class="btn-sub" id="btn-back">戻る</button>
         </div>
       </div>
     `;
@@ -1802,10 +1811,10 @@ const UI = {
       try {
         AccountManager.saveUsername(input ? input.value : "");
         AudioSystem.playUiSuccess();
-        this.showToast("USERNAME SAVED");
+        this.showToast("ユーザー名を保存しました");
         this.showAccount();
       } catch (error) {
-        this.showToast("USERNAME 2+ CHARS");
+        this.showToast("ユーザー名は2文字以上にしてください");
       }
     });
     document.getElementById("btn-account-signout").addEventListener("click", () => {
@@ -1820,14 +1829,14 @@ const UI = {
     const skills = ball.skills.length
       ? ball.skills.map((skill) => `${skill.name} ★${skill.level}`).join(" / ")
       : "スキルなし";
-    this.showToast(`BALL ${number}: ${skills}`);
+    this.showToast(`ボール${number}: ${skills}`);
   },
 
   showPaddleDetail(paddle) {
     const skills = paddle.skills.length
       ? paddle.skills.map((skill) => `${skill.name} ★${skill.level}`).join(" / ")
       : "パドルスキルなし";
-    this.showToast(`PADDLE: ${skills}`);
+    this.showToast(`パドル: ${skills}`);
   },
 
   showBumperDetail(bumper) {
@@ -1836,39 +1845,39 @@ const UI = {
       ? bumper.skills.map((skill) => `${skill.name} Lv${skill.level}`).join(" / ")
       : "バンパースキルなし";
     if (!bumper.unlocked || (bumper.level || 0) <= 0) {
-      this.showToast(`BUMPER LOCKED: BUY ${formatNumber(BUMPER_UNLOCK_COST)}T`);
+      this.showToast(`バンパー未解放: ${formatNumber(BUMPER_UNLOCK_COST)}Tで購入`);
       return;
     }
-    this.showToast(`BUMPER Lv ${bumper.level} HP ${bumper.hp}/${bumper.maxHp}: AUTO FROM BALLS / ${skills}`);
+    this.showToast(`バンパー Lv${bumper.level} HP ${bumper.hp}/${bumper.maxHp}: ボールから自動連携 / ${skills}`);
   },
 
   showBallDetail(ball, number) {
     const skills = ball.skills.length
       ? ball.skills.map((skill) => `${this.skillDisplayName(skill)} ★${skill.level}`).join(" / ")
-      : "NO SKILL";
-    this.showToast(`BALL ${number}: ${skills}`);
+      : "スキルなし";
+    this.showToast(`ボール${number}: ${skills}`);
   },
 
   showPaddleDetail(paddle) {
     const skills = paddle.skills.length
       ? paddle.skills.map((skill) => `${this.skillDisplayName(skill)} ★${skill.level}`).join(" / ")
-      : "NO SKILL";
-    this.showToast(`PADDLE: ${skills}`);
+      : "スキルなし";
+    this.showToast(`パドル: ${skills}`);
   },
 
   showBumperDetail(bumper) {
     if (!bumper) return;
     const skills = bumper.skills.length
       ? bumper.skills.map((skill) => `${this.skillDisplayName(skill)} ★${skill.level}`).join(" / ")
-      : "NO SKILL";
+      : "スキルなし";
     if (!bumper.unlocked || (bumper.level || 0) <= 0) {
-      this.showToast(`BUMPER LOCKED: BUY ${formatNumber(BUMPER_UNLOCK_COST)}T`);
+      this.showToast(`バンパー未解放: ${formatNumber(BUMPER_UNLOCK_COST)}Tで購入`);
       return;
     }
-    this.showToast(`BUMPER Lv ${bumper.level} HP ${bumper.hp}/${bumper.maxHp}: AUTO FROM BALLS / ${skills}`);
+    this.showToast(`バンパー Lv${bumper.level} HP ${bumper.hp}/${bumper.maxHp}: ボールから自動連携 / ${skills}`);
   },
 
-  showConfirm({ title, message, confirmLabel = "OK", cancelLabel = "CANCEL", onConfirm }) {
+  showConfirm({ title, message, confirmLabel = "決定", cancelLabel = "キャンセル", onConfirm }) {
     let root = document.getElementById("confirm-root");
     if (!root) {
       root = document.createElement("div");

@@ -292,12 +292,15 @@ class Block {
   }
 
   drawSpecialAura(ctx, x, y, w, h, r) {
+    const minimal = typeof Game !== "undefined" && Game.isMinimalModeEnabled && Game.isMinimalModeEnabled();
     const pulse = 0.5 + Math.sin(this.age * Math.PI) * 0.5;
     if (this.effect === "regen") {
       ctx.save();
       ctx.globalAlpha = 0.4 + pulse * 0.6;
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = "#4aff88";
+      if (!minimal) {
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "#4aff88";
+      }
       ctx.strokeStyle = "rgba(74,255,136,0.42)";
       ctx.lineWidth = 1;
       roundedRect(ctx, x - 2, y - 2, w + 4, h + 4, r + 2);
@@ -309,8 +312,10 @@ class Block {
     if (this.effect === "healBurst") {
       ctx.save();
       ctx.globalAlpha = 0.62;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = "#ff8844";
+      if (!minimal) {
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "#ff8844";
+      }
       ctx.strokeStyle = "rgba(255,136,68,0.38)";
       ctx.lineWidth = 1;
       roundedRect(ctx, x - 2, y - 2, w + 4, h + 4, r + 2);
@@ -323,8 +328,10 @@ class Block {
       ctx.save();
       const spread = 4 + pulse * 10;
       ctx.globalAlpha = 0.22 + pulse * 0.18;
-      ctx.shadowBlur = 6 + pulse * 8;
-      ctx.shadowColor = "#aa66ff";
+      if (!minimal) {
+        ctx.shadowBlur = 6 + pulse * 8;
+        ctx.shadowColor = "#aa66ff";
+      }
       ctx.strokeStyle = "rgba(170,102,255,0.46)";
       ctx.lineWidth = 1;
       roundedRect(ctx, x - spread, y - spread, w + spread * 2, h + spread * 2, r + spread);
